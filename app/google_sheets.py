@@ -15,9 +15,7 @@ MENU_ITEMS_SHEET_ID = 1153080402
 CUSTOMERS_SHEET_ID = 821617987
 EXTRA_INGR_SHEET_ID = 2019426420
 
-creds = ""
-#Credentials.from_service_account_file("google_sheets_cred.json", scopes=SCOPES))
-
+creds = Credentials.from_service_account_file("google_sheets_cred.json", scopes=SCOPES)
 client = gspread.authorize(creds)
 
 menu_items_sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(MENU_ITEMS_SHEET_ID)
