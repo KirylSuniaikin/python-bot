@@ -1,11 +1,13 @@
 import logging
+import os
 import uuid
 from datetime import datetime
 
 import gspread
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
-from app.models.models import MenuItem, OrderItem, Order, Customer, ExtraIngr, OrderTO
+from app.models.models import MenuItem, OrderItem, Order, Customer, ExtraIngr, OrderTO, Check
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 SPREADSHEET_ID = "11tLnA8whcBHykGf8OmuOwmacbvons4BIHx7ZjvteNX0"
@@ -15,14 +17,83 @@ MENU_ITEMS_SHEET_ID = 1153080402
 CUSTOMERS_SHEET_ID = 821617987
 EXTRA_INGR_SHEET_ID = 2019426420
 
-creds = Credentials.from_service_account_file("google_sheets_cred.json", scopes=SCOPES)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+creds_path = os.path.join(BASE_DIR, "..", "google_sheets_cred.json")
+creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
 client = gspread.authorize(creds)
+drive_service = build("drive", "v3", credentials=creds)
+
 
 menu_items_sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(MENU_ITEMS_SHEET_ID)
 orders_sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(ORDERS_SHEET_ID)
 order_items_sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(ORDER_ITEMS_SHEET_ID)
 customers_sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(CUSTOMERS_SHEET_ID)
 extra_ingr_sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(EXTRA_INGR_SHEET_ID)
+
+
+def get_order_data(order_id):
+    logging.info(f"Getting order data for order_id: {order_id}")
+    orders = orders_sheet.get_all_records()
+    order_items = order_items_sheet.get_all_records()
+
+    order_data = next((order for order in orders if str(order["Order No"]) == str(order_id)), None)
+
+    if not order_data:
+        logging.error(f"Order data not found for order_id: {order_id}")
+        return None
+
+    items = [
+        OrderItem(
+            order_no=item["Order No"],
+            id=item["ID"],
+            name=item["Name"],
+            quantity=int(item["Quantity"]),
+            amount=float(item["Amount"]),
+            size=item["Size"],
+            category=item["Category"],
+            isGarlicCrust=str(item["isGarlicCrust"]).strip().lower() == "true",
+            isThinDough=str(item["isThinDough"]).strip().lower() == "true",
+            description=item["Description"]
+        )
+        for item in order_items if str(item["Order No"]) == str(order_id)
+    ]
+
+    check = Check(
+        order_id=order_id,
+        total=float(order_data["Amount paid"]),
+        items=items,
+        date=order_data["Date and Time"]
+    )
+    logging.info(f"Check created: {check.total}")
+    return check
+
+
+def save_check_link(order_id, link):
+    data = orders_sheet.get_all_records()
+
+    for index, row in enumerate(data, start=2):
+        if str(row["Order No"]) == str(order_id):
+            orders_sheet.update_cell(index, 8, link)  # Тут должен быть индекс строки
+            logging.info(f"Check link saved for order_id: {order_id}")
+            break
+
+
+def get_order_by_id(order_id):
+    data = orders_sheet.get_all_records()
+
+    for row in data:
+        if str(row["Order No"]) == str(order_id):
+            return Order(
+                order_no=row["Order No"],
+                telephone_no=row["Telephone No"],
+                status=row["Status"],
+                date_and_time=row["Date and Time"],
+                type=row["Type"],
+                address=row["Address"],
+                amount_paid=row["Amount paid"]
+            )
+
+    return None
 
 
 def save_user_name(phone_number, name):
@@ -34,12 +105,13 @@ def save_user_name(phone_number, name):
 def update_user_info(order: Order):
     data = customers_sheet.get_all_records()
     user_row_index = None
+    logging.info("User row index: " + str(user_row_index))
 
     for i, row in enumerate(data, start=2):
         if str(row["Telephone No"]) == str(order.telephone_no):
             user_row_index = i
             break
-
+    logging.info("User row index: " + str(user_row_index))
     if user_row_index is None:
         logging.warning(f"User with phone {order.telephone_no} not found in Google Sheets.")
         return

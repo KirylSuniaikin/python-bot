@@ -2,19 +2,29 @@ import logging
 import uuid
 from datetime import datetime
 
-from app.google_sheets import add_new_order, add_new_order_item, get_user_phone_number, update_user_info
+from app.google_sheets import add_new_order, add_new_order_item, get_user_phone_number, update_user_info, user_exists, \
+    add_new_user
 from app.models.models import OrderTO, Order, OrderItem
+from app.services.check_generator import generate_pdf
 from app.whatsapp import send_order_confirmation
 
 
 def create_new_order(order: OrderTO):
     order_no = str(uuid.uuid4())[:8]
-    telephone_no = get_user_phone_number(order.user_id) or "Error: unknown customer"
+
+    if order.tel:
+        telephone_no = order.tel
+        if not user_exists(telephone_no):
+            add_new_user(telephone_no)
+    else:
+        telephone_no = get_user_phone_number(order.user_id) or "Error: unknown customer"
+
     address = ""
     order_items = order.items
 
-    sorted_items = sorted(order_items, key=lambda x: ["Combo Deal", "Pizzas", "Sides", "Beverages"].index(x["category"]))
-    logging.info(f"We are here")
+    sorted_items = sorted(order_items, key=lambda x: ["Combo Deals", "Pizzas", "Sides", "Beverages"].index(x["category"]))
+    logging.info(order)
+
     new_order = Order(
         order_no=order_no,
         telephone_no=telephone_no,
@@ -24,31 +34,13 @@ def create_new_order(order: OrderTO):
         address=address,
         amount_paid=order.amount_paid
     )
-
     add_new_order(new_order)
-
-    order_summary = []
 
     for item in sorted_items:
         category = item["category"]
-        size = f"({item['size']})" if category in ["Combo Deals", "Pizza"] and item["size"] else ""
         description = item.get("description", "")
-        is_garlic_crust = item.get("isGarlicCrust", False) if item["category"] == "Pizzas" or item["category"] == "Combo Deals" else ""
-        is_thin_dough = item.get("isThinDough", False) if item["category"] == "Pizzas" or item["category"] == "Combo Deals" else ""
-        is_garlic_crust_text = "Garlic Crust" if item.get("isGarlicCrust", False) else ""
-        is_thin_dough_text = "Thin Dough" if item.get("isThinDough", False) else ""
-
-        details = []
-        if description:
-            details.append(description)
-        if is_garlic_crust:
-            details.append(is_garlic_crust_text)
-        if is_thin_dough:
-            details.append(is_thin_dough_text)
-
-        details_text = "\n   - " + "\n   - ".join(details) if details else ""
-
-        order_summary.append(f" *{item['name']}* {size} - {item['amount']:.3f} BHD{details_text}")
+        is_garlic_crust = item.get("isGarlicCrust", False) if category in ["Pizzas", "Combo Deals"] else False
+        is_thin_dough = item.get("isThinDough", False) if category in ["Pizzas", "Combo Deals"] else False
 
         new_item = OrderItem(
             order_no=order_no,
@@ -65,7 +57,8 @@ def create_new_order(order: OrderTO):
         add_new_order_item(new_item)
 
     update_user_info(new_order)
-    send_order_confirmation(telephone_no, order_summary, order.amount_paid)
+    # generate_pdf(order_no)
+    send_order_confirmation(telephone_no, sorted_items, order.amount_paid, order_no)
 
     return {
         "status": "success",
