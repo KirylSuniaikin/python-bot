@@ -51,8 +51,17 @@ class OrderItem:
 
 
 @dataclass
+class Check:
+    order_id: str
+    total: float
+    items: List[OrderItem]
+    date: str
+
+
+@dataclass
 class OrderTO:
     # type: str  # "Take Away" or "Delivery"
+    tel: str
     amount_paid: float
     user_id: str
     items: list[dict]

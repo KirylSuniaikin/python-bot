@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import requests
 import os
 
-from app.google_sheets import get_user_id
+from app.google_sheets import get_user_id, get_user_name
 
 load_dotenv()
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
@@ -14,22 +14,14 @@ APP_ID = os.getenv("APP_ID")
 APP_SECRET = os.getenv("APP_SECRET")
 
 
-def send_order_confirmation(phone_number, order_summary, total_amount):
+def send_order_confirmation(phone_number, sorted_items, total_amount, order_id):
     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
 
-    message_body = f"""
-        ✅ *Order Confirmation*
-        Your order:
-        {chr(10).join(order_summary)}
-        
-        💰 *Total: {total_amount:.3f} BHD*
-        Thank you! We are processing your order. 🍕
-            """.strip()
-
+    message_body = build_order_message(order_id, sorted_items, total_amount)
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
@@ -42,14 +34,75 @@ def send_order_confirmation(phone_number, order_summary, total_amount):
     logging.info(f"Sent order confirmation to {phone_number}: {response.status_code}, Response: {response.text}")
 
 
+def build_order_message(order_id, sorted_items, total_amount):
+    order_summary_lines = []
+
+    for item in sorted_items:
+        quantity = item.get("quantity", 1)
+        name = item["name"]
+        size = item.get("size", "")
+        category = item.get("category", "")
+
+        is_garlic_crust = item.get("isGarlicCrust", False)
+        is_thin_dough = item.get("isThinDough", False)
+        desc = item.get("description", "").strip()
+
+        details_block = []
+
+        if category == "Combo Deals" and ";" in desc:
+            combo_parts = desc.split(";")
+            for part in combo_parts:
+                lines = part.strip().split("+")
+                main = lines[0].strip()
+                extras = [f"+{x.strip()}" for x in lines[1:] if x.strip()]
+                formatted = f"    *{main}*\n" + "\n".join([f"      {e}" for e in extras])
+                details_block.append(formatted)
+        else:
+            details = []
+
+            if desc:
+                desc_clean = desc.replace(";", "")
+                details += [x.strip() for x in desc_clean.split("+") if x.strip() and x.strip() != "'"]
+            if is_garlic_crust:
+                details.append("Garlic Crust")
+            if is_thin_dough:
+                details.append("Thin Dough")
+
+            if details:
+                details_block.append("\n".join([f"    +{d}" for d in details]))
+
+        title = f"{quantity}x *{name}*"
+        if size:
+            title += f" ({size})"
+
+        full_line = title
+        if details_block:
+            full_line += "\n" + "\n".join(details_block)
+
+        order_summary_lines.append(full_line)
+
+    order_body = "\n".join(order_summary_lines)
+
+    message_body = f"""
+✅ *Got it! Your order {order_id} is confirmed!*
+
+{order_body}
+
+💰 Total: {total_amount:.3f} BHD
+Thank you! See you soon! 🍕
+""".strip()
+
+    return message_body
+
+
 def send_ready_message(recipient_phone, user_id):
+    user_name = get_user_name(user_id)
     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
 
-    message_header = "Enjoy you meal! 🍕🎉"
     logging.info(f"phone : {recipient_phone}")
     payload = {
         "messaging_product": "whatsapp",
@@ -66,7 +119,18 @@ def send_ready_message(recipient_phone, user_id):
                         {
                             "type": "text",
                             "parameter_name": "text",
-                            "text": message_header}
+                            "text": f"Thanks for choosing IC Pizza, {user_name}! Enjoy your food🤌"
+                        }
+                    ]
+                },
+                {
+                    "type": "BODY",
+                    "parameters": [
+                        {
+                            "type": "text",
+                            "parameter_name": "name",
+                            "text": str(user_name)
+                        }
                     ]
                 },
                 {
@@ -74,7 +138,10 @@ def send_ready_message(recipient_phone, user_id):
                     "sub_type": "url",
                     "index": 1,
                     "parameters": [
-                        {"type": "text", "text": str(user_id)}
+                        {
+                            "type": "text",
+                            "text": str(user_id)
+                        }
                     ]
                 }
             ]
@@ -112,7 +179,7 @@ def send_menu(recipient_phone, namo):
                         {
                             "type": "text",
                             "parameter_name": "header",
-                            "text": f"{namo}👋"
+                            "text": f"{namo}🤝"
                         }
                     ]
                 },
@@ -131,7 +198,9 @@ def send_menu(recipient_phone, namo):
                     "sub_type": "url",
                     "index": 0,
                     "parameters": [
-                        {"type": "text", "text": str(user_id)}
+                        {
+                            "type": "text",
+                            "text": str(user_id)}
                     ]
                 }
             ]
@@ -155,109 +224,12 @@ def ask_for_name(recipient_phone):
         "to": recipient_phone,
         "type": "text",
         "text": {
-            "body": "Hey there! I’m IC Pizza Bot 🤖—that’s what the programmers named me. I don’t think we’ve met yet! What’s your name? 😊"
+            "body": "Salam Aleikum 👋!\n"
+                    "I’m Hamood, IC Pizza Bot 🤖, your friendly assistant to make ordering super easy and fast!\n"
+                    "Glad to have you here!\n"
+                    "What’s your name? 😊"
         }
     }
 
     response = requests.post(url, json=payload, headers=headers)
     logging.info(f"Sent name request to {recipient_phone}: {response.status_code}")
-
-
-# def log_http_response(response):
-#     logging.info(f"Status: {response.status_code}")
-#     logging.info(f"Content-type: {response.headers.get('content-type')}")
-#     logging.info(f"Body: {response.text}")
-#
-#
-# def get_text_message_input(recipient, text):
-#     return json.dumps(
-#         {
-#             "messaging_product": "whatsapp",
-#             "recipient_type": "individual",
-#             "to": recipient,
-#             "type": "text",
-#             "text": {"preview_url": False, "body": text},
-#         }
-#     )
-#
-#
-# def generate_response(response):
-#     # Return text in uppercase
-#     return response.upper()
-
-
-# def send_message(data):
-#     headers = {
-#         "Content-type": "application/json",
-#         "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
-#     }
-#
-#     url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
-#
-#     try:
-#         response = requests.post(
-#             url, data=data, headers=headers, timeout=10
-#         )  # 10 seconds timeout as an example
-#         response.raise_for_status()  # Raises an HTTPError if the HTTP request returned an unsuccessful status code
-#     except requests.Timeout:
-#         logging.error("Timeout occurred while sending message")
-#         return jsonify({"status": "error", "message": "Request timed out"}), 408
-#     except (
-#         requests.RequestException
-#     ) as e:  # This will catch any general request exception
-#         logging.error(f"Request failed due to: {e}")
-#         return jsonify({"status": "error", "message": "Failed to send message"}), 500
-#     else:
-#         # Process the response as normal
-#         log_http_response(response)
-#         return response
-#
-
-# def process_text_for_whatsapp(text):
-#     # Remove brackets
-#     pattern = r"\【.*?\】"
-#     # Substitute the pattern with an empty string
-#     text = re.sub(pattern, "", text).strip()
-#
-#     # Pattern to find double asterisks including the word(s) in between
-#     pattern = r"\*\*(.*?)\*\*"
-#
-#     # Replacement pattern with single asterisks
-#     replacement = r"*\1*"
-#
-#     # Substitute occurrences of the pattern with the replacement
-#     whatsapp_style_text = re.sub(pattern, replacement, text)
-#
-#     return whatsapp_style_text
-
-
-# def process_whatsapp_message(body):
-#     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
-#     name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
-#
-#     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-#     message_body = message["text"]["body"]
-#
-#     # TODO: implement custom function here
-#     response = generate_response(message_body)
-#
-#     # OpenAI Integration
-#     # response = generate_response(message_body, wa_id, name)
-#     # response = process_text_for_whatsapp(response)
-#
-#     data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response)
-#     send_message(data)
-
-
-# def is_valid_whatsapp_message(body):
-#     """
-#     Check if the incoming webhook event has a valid WhatsApp message structure.
-#     """
-#     return (
-#         body.get("object")
-#         and body.get("entry")
-#         and body["entry"][0].get("changes")
-#         and body["entry"][0]["changes"][0].get("value")
-#         and body["entry"][0]["changes"][0]["value"].get("messages")
-#         and body["entry"][0]["changes"][0]["value"]["messages"][0]
-#     )
