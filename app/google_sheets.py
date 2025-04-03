@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from datetime import datetime
 
@@ -16,7 +17,9 @@ MENU_ITEMS_SHEET_ID = 1153080402
 CUSTOMERS_SHEET_ID = 821617987
 EXTRA_INGR_SHEET_ID = 2019426420
 
-creds = Credentials.from_service_account_file("google_sheets_cred.json", scopes=SCOPES)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+creds_path = os.path.join(BASE_DIR, "..", "google_sheets_cred.json")
+creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
 client = gspread.authorize(creds)
 drive_service = build("drive", "v3", credentials=creds)
 
