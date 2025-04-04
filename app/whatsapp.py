@@ -39,7 +39,7 @@ def build_order_message(order_id, sorted_items, total_amount):
 
     for item in sorted_items:
         quantity = item.get("quantity", 1)
-        name = item["name"]
+        name = item["name"].strip()
         size = item.get("size", "")
         category = item.get("category", "")
 
@@ -110,7 +110,7 @@ def send_ready_message(recipient_phone, user_id):
         "to": recipient_phone,
         "type": "template",
         "template": {
-            "name": "ready_message",
+            "name": "ready_message2",
             "language": {"code": "en"},
             "components": [
                 {
@@ -170,7 +170,7 @@ def send_menu(recipient_phone, namo):
         "to": recipient_phone,
         "type": "template",
         "template": {
-            "name": "send_menu",
+            "name": "send_menu2",
             "language": {"code": "en"},
             "components": [
                 {
