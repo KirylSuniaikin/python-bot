@@ -5,7 +5,6 @@ from datetime import datetime
 from app.google_sheets import add_new_order, add_new_order_item, get_user_phone_number, update_user_info, user_exists, \
     add_new_user
 from app.models.models import OrderTO, Order, OrderItem
-from app.services.check_generator import generate_pdf
 from app.whatsapp import send_order_confirmation
 
 
