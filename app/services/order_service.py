@@ -5,7 +5,7 @@ from datetime import datetime
 from app.google_sheets import add_new_order, add_new_order_item, get_user_phone_number, update_user_info, user_exists, \
     add_new_user
 from app.models.models import OrderTO, Order, OrderItem
-from app.whatsapp import send_order_confirmation
+from app.whatsapp import send_order_confirmation, send_info_to_kitchen, send_order_to_kitchen_text
 
 
 def create_new_order(order: OrderTO):
@@ -56,8 +56,9 @@ def create_new_order(order: OrderTO):
         add_new_order_item(new_item)
 
     update_user_info(new_order)
-    # generate_pdf(order_no)
     send_order_confirmation(telephone_no, sorted_items, order.amount_paid, order_no)
+    send_order_to_kitchen_text(order_no, sorted_items, order.amount_paid)
+    send_info_to_kitchen(order_no)
 
     return {
         "status": "success",

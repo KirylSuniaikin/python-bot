@@ -31,6 +31,19 @@ customers_sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(CUSTOME
 extra_ingr_sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet_by_id(EXTRA_INGR_SHEET_ID)
 
 
+def make_order_ready(order_id):
+    logging.info(f"Making order {order_id} ready")
+    data = orders_sheet.get_all_records()
+
+    for index, row in enumerate(data, start=2):
+        if str(row["Order No"]).strip() == str(order_id).strip():
+            orders_sheet.update_cell(index, 3, "Ready")
+            logging.info(f"Order {order_id} marked as ready")
+            break
+    else:
+        logging.error(f"Order {order_id} not found")
+
+
 def get_order_data(order_id):
     logging.info(f"Getting order data for order_id: {order_id}")
     orders = orders_sheet.get_all_records()
@@ -169,6 +182,14 @@ def get_user_id(phone_number):
     for row in data:
         if str(row["Telephone No"]).strip() == str(phone_number).strip():
             return row["ID"]
+    return None
+
+
+def get_user_phone_by_order_id(order_id):
+    data = orders_sheet.get_all_records()
+    for row in data:
+        if str(row["Order No"]).strip() == str(order_id).strip():
+            return row["Telephone No"]
     return None
 
 
