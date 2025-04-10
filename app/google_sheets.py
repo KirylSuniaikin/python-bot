@@ -2,7 +2,7 @@ import logging
 import os
 import uuid
 from datetime import datetime
-
+import pytz
 import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -86,7 +86,7 @@ def save_check_link(order_id, link):
 
     for index, row in enumerate(data, start=2):
         if str(row["Order No"]) == str(order_id):
-            orders_sheet.update_cell(index, 8, link)  # Тут должен быть индекс строки
+            orders_sheet.update_cell(index, 8, link)
             logging.info(f"Check link saved for order_id: {order_id}")
             break
 
@@ -134,7 +134,7 @@ def update_user_info(order: Order):
 
     new_orders_count = current_orders + 1
     new_total_paid = current_amount_paid + order.amount_paid
-    current_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+    current_date = datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M")
 
     customers_sheet.update(
         f"E{user_row_index}",

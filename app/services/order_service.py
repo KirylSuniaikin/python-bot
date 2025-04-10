@@ -1,5 +1,7 @@
 import logging
+import random
 import uuid
+import pytz
 from datetime import datetime
 
 from app.google_sheets import add_new_order, add_new_order_item, get_user_phone_number, update_user_info, user_exists, \
@@ -9,7 +11,12 @@ from app.whatsapp import send_order_confirmation, send_info_to_kitchen, send_ord
 
 
 def create_new_order(order: OrderTO):
-    order_no = str(uuid.uuid4())[:8]
+    year_suffix = str(datetime.now(pytz.timezone("Asia/Bahrain")).year)[-2:]
+    logging.info(f"Year suffix: {year_suffix}")
+    random_digits = str(random.randint(1000, 9999))
+    logging.info(f"Year suffix: {random_digits}")
+    order_no = f"a{year_suffix}{random_digits}"
+    logging.info(f"Year suffix: {order_no}")
 
     if order.tel:
         telephone_no = order.tel
@@ -22,13 +29,13 @@ def create_new_order(order: OrderTO):
     order_items = order.items
 
     sorted_items = sorted(order_items, key=lambda x: ["Combo Deals", "Pizzas", "Sides", "Beverages"].index(x["category"]))
-    logging.info(order)
+    logging.info(datetime.now(pytz.timezone("Asia/Bahrain")))
 
     new_order = Order(
         order_no=order_no,
         telephone_no=telephone_no,
         status="Kitchen Phase",
-        date_and_time=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        date_and_time=datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M"),
         type="Pickup",
         address=address,
         amount_paid=order.amount_paid
