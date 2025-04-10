@@ -43,8 +43,6 @@ def build_order_message(order_id, sorted_items, total_amount):
         size = item.get("size", "")
         category = item.get("category", "")
 
-        is_garlic_crust = item.get("isGarlicCrust", False)
-        is_thin_dough = item.get("isThinDough", False)
         desc = item.get("description", "").strip()
 
         details_block = []
@@ -63,10 +61,6 @@ def build_order_message(order_id, sorted_items, total_amount):
             if desc:
                 desc_clean = desc.replace(";", "")
                 details += [x.strip() for x in desc_clean.split("+") if x.strip() and x.strip() != "'"]
-            if is_garlic_crust:
-                details.append("Garlic Crust")
-            if is_thin_dough:
-                details.append("Thin Dough")
 
             if details:
                 details_block.append("\n".join([f"    +{d}" for d in details]))
@@ -181,9 +175,6 @@ def build_kitchen_message(order_id, sorted_items, total_amount):
         name = item["name"].strip()
         size = item.get("size", "")
         category = item.get("category", "")
-
-        is_garlic_crust = item.get("isGarlicCrust", False)
-        is_thin_dough = item.get("isThinDough", False)
         desc = item.get("description", "").strip()
 
         details_block = []
@@ -202,10 +193,6 @@ def build_kitchen_message(order_id, sorted_items, total_amount):
             if desc:
                 desc_clean = desc.replace(";", "")
                 details += [x.strip() for x in desc_clean.split("+") if x.strip() and x.strip() != "'"]
-            if is_garlic_crust:
-                details.append("Garlic Crust")
-            if is_thin_dough:
-                details.append("Thin Dough")
 
             if details:
                 details_block.append("\n".join([f"    +{d}" for d in details]))
