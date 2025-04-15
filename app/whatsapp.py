@@ -89,7 +89,7 @@ Thank you! See you soon! 🍕
     return message_body
 
 
-def send_order_to_kitchen_text(order_id, sorted_items, total_amount):
+def send_order_to_kitchen_text(order_id, sorted_items, total_amount, telephone_no):
     logging.info(f"Sending order to kitchen: {order_id}, items: {sorted_items}, total: {total_amount}")
     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
     headers = {
@@ -97,12 +97,12 @@ def send_order_to_kitchen_text(order_id, sorted_items, total_amount):
         "Content-Type": "application/json"
     }
 
-    message_body = build_kitchen_message(order_id, sorted_items, total_amount)
+    message_body = build_kitchen_message(order_id, sorted_items, total_amount, telephone_no)
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        # "to": "48512066441",
-        "to": "97333607710",
+        "to": "48512066441",
+        # "to": "97333607710",
         "type": "text",
         "text": {"body": message_body}
     }
@@ -120,8 +120,8 @@ def send_info_to_kitchen(order_id):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": "97333607710",
-        # "to": "48512066441",
+        # "to": "97333607710",
+        "to": "48512066441",
         "type": "template",
         "template": {
             "name": "send_to_kitchen4",
@@ -167,7 +167,7 @@ def send_info_to_kitchen(order_id):
     return response
 
 
-def build_kitchen_message(order_id, sorted_items, total_amount):
+def build_kitchen_message(order_id, sorted_items, total_amount, telephone_no):
     order_summary_lines = []
 
     for item in sorted_items:
@@ -211,6 +211,9 @@ def build_kitchen_message(order_id, sorted_items, total_amount):
 
     message_body = f"""
 *New order {order_id}*!
+
+client phone: *{telephone_no}*
+client name: *{get_user_name(telephone_no)}*
 
 {order_body}
 

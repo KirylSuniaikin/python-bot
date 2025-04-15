@@ -64,7 +64,7 @@ def create_new_order(order: OrderTO):
 
     update_user_info(new_order)
     send_order_confirmation(telephone_no, sorted_items, order.amount_paid, order_no)
-    send_order_to_kitchen_text(order_no, sorted_items, order.amount_paid)
+    send_order_to_kitchen_text(order_no, sorted_items, order.amount_paid, telephone_no)
     send_info_to_kitchen(order_no)
 
     return {
