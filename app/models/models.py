@@ -34,6 +34,7 @@ class Order:
     type: str
     address: str
     amount_paid: float
+    payment_type: str
 
 
 @dataclass
@@ -48,6 +49,7 @@ class OrderItem:
     isGarlicCrust: bool
     isThinDough: bool
     description: str
+    sale_amount: float
 
 
 @dataclass
@@ -60,11 +62,12 @@ class Check:
 
 @dataclass
 class OrderTO:
-    # type: str  # "Take Away" or "Delivery"
+    type: str
     tel: str
     amount_paid: float
     user_id: str
     items: list[dict]
+    payment_type: str
 
 
 @dataclass

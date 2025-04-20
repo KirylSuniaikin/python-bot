@@ -7,7 +7,7 @@ from app.google_sheets import get_menu_items, get_all_extra_ingr, get_user_id, g
     make_order_ready
 from app.models.models import OrderTO
 from app.services.customer_service import create_update_user
-from app.services.order_service import create_new_order
+from app.services.order_service import create_new_order, get_all_active_orders, update_order
 from app.whatsapp import send_ready_message
 
 api_blueprint = Blueprint("api", __name__)
@@ -49,11 +49,15 @@ def create_order():
             user_id = data.get("user_id")
             amount_paid = data["amount_paid"]
             items = data["items"]
+            payment_type = data.get("payment_type", "")
+            order_type = data.get("delivery_method", "Pick Up")
 
             order = OrderTO(
+                type=order_type,
                 tel=tel,
                 user_id=user_id,
                 amount_paid=amount_paid,
+                payment_type=payment_type,
                 items=items
             )
         except KeyError as e:
@@ -61,6 +65,40 @@ def create_order():
 
         logging.info(f"Creating new order: {order}")
         response = create_new_order(order)
+        return jsonify(response), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_blueprint.route("/editOrder", methods=["POST"])
+def edit_order():
+    try:
+        logging.info(f"{request.json}")
+        data = request.json
+        if not data:
+            return jsonify({"error": "Invalid request, JSON data required"}), 400
+
+        try:
+            order_id = request.args.get("orderId")
+            tel = data.get("tel")
+            user_id = data.get("user_id")
+            amount_paid = data["amount_paid"]
+            items = data["items"]
+            payment_type = data.get("payment_type")
+
+            order = OrderTO(
+                type=data.get("delivery_method", ""),
+                tel=tel,
+                user_id=user_id,
+                amount_paid=amount_paid,
+                items=items,
+                payment_type=payment_type
+            )
+        except KeyError as e:
+            return jsonify({"error": f"Missing required field: {e}"}), 400
+
+        logging.info(f"Updating order with id: {order_id}")
+        response = update_order(order, order_id)
         return jsonify(response), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -83,6 +121,15 @@ def create_order():
 #         return jsonify(response), 200
 #     except Exception as e:
 #         return jsonify({"error": str(e)}), 500
+
+@api_blueprint.route("/getAllActiveOrders", methods=["GET"])
+def get_active_orders_v1():
+    try:
+        active_orders = get_all_active_orders()
+        return jsonify(active_orders)
+    except Exception as e:
+        logging.exception("Error in get_active_orders")
+        return jsonify({"error": str(e)}), 500
 
 
 @api_blueprint.route("/readyAction", methods=["POST"])

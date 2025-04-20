@@ -144,6 +144,49 @@ def update_user_info(order: Order):
     logging.info(f"Updated user {order.telephone_no}: Orders={new_orders_count}, Amount Paid={new_total_paid}, Last Order={current_date}")
 
 
+def edit_user_info(order: OrderTO, orderId: str):
+    orders = orders_sheet.get_all_records()
+    customers = customers_sheet.get_all_records()
+    old_order = None
+    for index, row in enumerate(orders, start=2):
+        if str(row["Order No"]) == orderId:
+            old_order = row
+            break
+    logging.info(f"Old order: {old_order}")
+    if not old_order:
+        logging.warning(f"Order with ID {orderId} not found.")
+        return
+    phone_number = old_order.get("Telephone No", "")
+    if not phone_number:
+        logging.warning(f"No phone number found for order {orderId}")
+        return
+    logging.info(f"Phone number: {phone_number}")
+    user_row_index = None
+    user_row = None
+    for i, row in enumerate(customers, start=2):
+        if str(row["Telephone No"]).strip() == str(phone_number).strip():
+            user_row_index = i
+            user_row = row
+            break
+    if not user_row_index:
+        logging.warning(f"User with phone {phone_number} not found.")
+        return
+    logging.info(f"User row index: {user_row_index}")
+    old_amount_paid = float(old_order.get("Amount paid", 0))
+    new_amount_paid = float(order.amount_paid)
+
+    current_total_paid = float(user_row.get("Amount Paid", 0))
+    updated_total_paid = current_total_paid - old_amount_paid + new_amount_paid
+    current_date = datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M")
+
+    customers_sheet.update(
+        f"F{user_row_index}:G{user_row_index}",
+        [[updated_total_paid, current_date]]
+    )
+
+    logging.info(f"User {phone_number} updated after order edit. Old paid: {old_amount_paid}, New paid: {new_amount_paid}, Total: {updated_total_paid}")
+    return phone_number
+
 def user_exists(phone_number):
     users_numbers = customers_sheet.col_values(2)
     return phone_number in users_numbers
@@ -174,6 +217,13 @@ def get_user_name(phone_number):
     for row in data:
         if str(row["Telephone No"]).strip() == str(phone_number).strip():
             return row["Name"]
+    return None
+
+
+def get_user_name_from_current_users(users, phone_number):
+    for user in users:
+        if str(user["Telephone No"]).strip() == str(phone_number).strip():
+            return user["Name"]
     return None
 
 
@@ -270,7 +320,8 @@ def add_new_order(order: Order):
         order.date_and_time,
         order.type,
         order.address,
-        order.amount_paid
+        order.amount_paid,
+        order.payment_type
     ])
 
 
@@ -285,5 +336,75 @@ def add_new_order_item(item: OrderItem):
         item.id,
         item.isGarlicCrust,
         item.isThinDough,
-        item.description
+        item.description,
+        item.sale_amount
     ])
+
+
+def delete_order_info(order_id):
+    orders = orders_sheet.get_all_records()
+    order_items = order_items_sheet.get_all_records()
+    for index, row in enumerate(orders, start=2):
+        if str(row["Order No"]).strip().lower() == str(order_id).strip().lower():
+            orders_sheet.delete_rows(index)
+            logging.info(f"Order {order_id} deleted")
+            break
+
+    rows_to_delete = []
+    for index1, row in enumerate(order_items, start=2):
+        if str(row["Order No"]).strip().lower() == str(order_id).strip().lower():
+            rows_to_delete.append(index1)
+
+    for index in reversed(rows_to_delete):
+        order_items_sheet.delete_rows(index)
+        logging.info(f"Order item {order_id} deleted on row {index}")
+
+
+def get_active_orders():
+    orders = orders_sheet.get_all_records()
+    order_items = order_items_sheet.get_all_records()
+    menu_items = menu_items_sheet.get_all_records()
+    users = customers_sheet.get_all_records()
+
+    active_orders = []
+    for order in orders:
+        if str(order["Status"]).strip().lower() != "ready":
+            order_id = order["Order No"]
+            order_items_for_order = [item for item in order_items if str(item["Order No"]).strip().lower() == str(order_id)]
+
+            items = []
+            user_name = get_user_name_from_current_users(users, order.get("Telephone No", "")) or "Unknown customer"
+            for item in order_items_for_order:
+                photo_url = next(
+                    (menu_item["Photo"] for menu_item in menu_items if str(menu_item["Name"]).strip().lower() == str(item["Name"]).strip().lower()),
+                    None
+                )
+                try:
+                    items.append({
+                        "name": item["Name"],
+                        "quantity": int(item["Quantity"]),
+                        "amount": float(item["Amount"]),
+                        "size": item.get("Size", ""),
+                        "category": item.get("Category", ""),
+                        "isGarlicCrust": str(item.get("isGarlicCrust", "")).strip().lower() == "true",
+                        "isThinDough": str(item.get("isThinDough", "")).strip().lower() == "true",
+                        "description": item.get("Description", ""),
+                        "discount_amount": item.get("Sale Amount", 0),
+                        "photo": photo_url,
+                    })
+                except Exception as e:
+                    print(f"Ошибка при обработке item: {item}, {e}")
+
+            active_orders.append({
+                "orderId": order_id,
+                "order_type": order.get("Type", ""),
+                "amount_paid": float(order.get("Amount paid", 0)),
+                "phone_number": order.get("Telephone No", ""),
+                "sale_amount": float(order.get("Sale Amount", 0)),
+                "customer_name": user_name,
+                "order_created": order.get("Date and Time", ""),
+                "payment_type": order.get("Payment Type", ""),
+                "items": items
+            })
+
+    return {"orders": active_orders}

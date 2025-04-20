@@ -36,11 +36,10 @@ def webhook():
                     send_menu(sender_phone, get_user_name(sender_phone))
 
             elif user_exists(sender_phone) and not user_has_name(sender_phone):
-                # Если юзер ещё не имеет имени, но отправил сообщение — считаем его именем
                 logging.info(f"User {sender_phone} entered name: {message_text}")
                 save_user_name(sender_phone, message_text)
                 logging.info(f"User {sender_phone} entered name: {message_text}")
-                send_menu(sender_phone, get_user_name(sender_phone))  # Отправляем благодарность + кнопку "View Menu"
+                send_menu(sender_phone, get_user_name(sender_phone))
 
         return jsonify({"status": "success"}), 200
 
