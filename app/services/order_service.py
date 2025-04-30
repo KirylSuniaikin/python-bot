@@ -26,7 +26,7 @@ def create_new_order(order: OrderTO):
     address = ""
     order_items = order.items
 
-    sorted_items = sorted(order_items, key=lambda x: ["Combo Deals", "Pizzas", "Sides", "Beverages"].index(x["category"]))
+    sorted_items = sorted(order_items, key=lambda x: ["Combo Deals", "Pizzas", "Sides", "Sauces", "Beverages"].index(x["category"]))
     new_order = Order(
         order_no=order_no,
         telephone_no=telephone_no,
