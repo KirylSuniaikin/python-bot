@@ -4,7 +4,8 @@ import uuid
 import pytz
 from datetime import datetime
 from app.google_sheets import add_new_order, add_new_order_item, get_user_phone_number, update_user_info, user_exists, \
-    add_new_user, get_active_orders, delete_order_info, edit_user_info, get_user_name, ger_photo_url_by_name
+    add_new_user, get_active_orders, delete_order_info, edit_user_info, \
+    menu_items_sheet, ger_photo_url_by_name_for_current_menu
 from app.models.models import OrderTO, Order, OrderItem
 from app.socketio import emit_order_created
 from app.whatsapp import send_order_confirmation, send_info_to_kitchen, \
@@ -82,6 +83,7 @@ def create_new_order(order: OrderTO, name):
 
 
 def build_order_payload(order: Order, items: list[OrderItem], user_name: str) -> dict:
+    menu = menu_items_sheet.get_all_records()
     return {
         "orderId": order.order_no,
         "order_type": order.type,
@@ -103,7 +105,7 @@ def build_order_payload(order: Order, items: list[OrderItem], user_name: str) ->
                 "isThinDough": i.isThinDough,
                 "description": i.description,
                 "discount_amount": i.sale_amount,
-                "photo": ger_photo_url_by_name(i.name),
+                "photo": ger_photo_url_by_name_for_current_menu(i.name, menu),
             }
             for i in items
         ]

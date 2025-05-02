@@ -327,7 +327,7 @@ def add_new_order(order: Order):
         order.address,
         order.amount_paid,
         order.payment_type,
-        # order.notes,
+        order.notes,
     ])
 
 
@@ -370,6 +370,7 @@ def get_active_orders():
     orders = orders_sheet.get_all_records()
     order_items = order_items_sheet.get_all_records()
     users = customers_sheet.get_all_records()
+    menu = menu_items_sheet.get_all_records()
 
     active_orders = []
     for order in orders:
@@ -380,7 +381,7 @@ def get_active_orders():
             items = []
             user_name = get_user_name_from_current_users(users, order.get("Telephone No", "")) or "Unknown customer"
             for item in order_items_for_order:
-                photo_url = ger_photo_url_by_name(item["Name"])
+                photo_url = ger_photo_url_by_name_for_current_menu(item["Name"], menu)
                 try:
                     items.append({
                         "name": item["Name"],
@@ -413,9 +414,8 @@ def get_active_orders():
     return {"orders": active_orders}
 
 
-def ger_photo_url_by_name(name):
-    data = menu_items_sheet.get_all_records()
-    for row in data:
+def ger_photo_url_by_name_for_current_menu(name, menu):
+    for row in menu:
         if str(row["Name"]).strip().lower() == str(name).strip().lower():
             return row["Photo"]
     logging.info(f"Photo URL for {name} not found")
@@ -439,6 +439,7 @@ def get_history_orders():
     orders = orders_sheet.get_all_records()
     order_items = order_items_sheet.get_all_records()
     users = customers_sheet.get_all_records()
+    menu = menu_items_sheet.get_all_records()
     bahrain_tz = pytz.timezone("Asia/Bahrain")
     now = datetime.now(bahrain_tz)
     cutoff_time = now - timedelta(days=1)
@@ -463,7 +464,7 @@ def get_history_orders():
             items = []
             user_name = get_user_name_from_current_users(users, order.get("Telephone No", "")) or "Unknown customer"
             for item in order_items_for_order:
-                photo_url = ger_photo_url_by_name(item["Name"])
+                photo_url = ger_photo_url_by_name_for_current_menu(item["Name"], menu)
                 try:
                     items.append({
                         "name": item["Name"],
