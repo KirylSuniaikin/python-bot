@@ -456,7 +456,6 @@ def get_history_orders():
         if order_time < cutoff_time:
             continue
         if str(order["Status"]).strip().lower() == "ready":
-            logging.info(f"Status with orderid: {order["Status"]}, {order["Order No"]}")
 
             order_id = order["Order No"]
             order_items_for_order = [item for item in order_items if str(item["Order No"]).strip().lower() == str(order_id)]
