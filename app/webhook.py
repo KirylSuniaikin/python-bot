@@ -25,7 +25,7 @@ def webhook():
 
             if message_text.lower() == "hello":
                 if not user_exists(sender_phone):
-                    add_new_user(sender_phone)
+                    add_new_user(sender_phone, "")
                     logging.info("User was added")
                     ask_for_name(sender_phone)
                 elif not user_has_name(sender_phone):
@@ -36,9 +36,7 @@ def webhook():
                     send_menu(sender_phone, get_user_name(sender_phone))
 
             elif user_exists(sender_phone) and not user_has_name(sender_phone):
-                logging.info(f"User {sender_phone} entered name: {message_text}")
                 save_user_name(sender_phone, message_text)
-                logging.info(f"User {sender_phone} entered name: {message_text}")
                 send_menu(sender_phone, get_user_name(sender_phone))
 
         return jsonify({"status": "success"}), 200

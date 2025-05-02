@@ -90,20 +90,16 @@ Thank you! See you soon! 🍕
 
 
 def send_order_confirmation(telephone_no, sorted_items, total_amount, order_id):
-    logging.info(f"Sending order to kitchen: {order_id}, items: {sorted_items}, total: {total_amount}")
     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
     message_body = build_kitchen_message(sorted_items)
-    logging.info("error1")
-    logging.info("error2")
 
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        # "to": telephone_no,
         "to": telephone_no,
         "type": "template",
         "template": {
@@ -116,7 +112,7 @@ def send_order_confirmation(telephone_no, sorted_items, total_amount, order_id):
                         {
                             "type": "text",
                             "parameter_name": "order_confirm",
-                            "text": f"✅ Got it! Your order {order_id} is confirmed!"
+                            "text": f"✅Got it! Your order {order_id} is confirmed!"
                         }
                     ]
                 },
@@ -140,7 +136,7 @@ def send_order_confirmation(telephone_no, sorted_items, total_amount, order_id):
     }
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=5)
-        logging.info(f"Sent info to kitchen : {response.status_code}, Response: {response.text}")
+        logging.info(f"Sent confirmation : {response.status_code}, Response: {response.text}")
         return response
     except Exception as e:
         logging.exception(f"Failed to send order to kitchen {e}")
@@ -155,9 +151,7 @@ def send_order_to_kitchen_text2(order_id, sorted_items, total_amount, telephone_
         "Content-Type": "application/json"
     }
     message_body = build_kitchen_message(sorted_items)
-    logging.info("error1")
     user_name = get_user_name(telephone_no)
-    logging.info("error2")
     header = f"{'✅ New order:' if not isEdit else '✏️ Order'} {order_id}{' updated!' if isEdit else '!'}"
 
     payload = {
@@ -267,7 +261,6 @@ def build_kitchen_message(sorted_items):
     order_parts = []
 
     for item in sorted_items:
-        logging.info("error3")
         quantity = item.get("quantity", 1)
         name = item["name"].strip()
         size = item.get("size", "").strip()
@@ -294,7 +287,6 @@ def send_ready_message(recipient_phone, user_id):
         "Content-Type": "application/json"
     }
 
-    logging.info(f"phone : {recipient_phone}")
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
@@ -353,9 +345,6 @@ def send_menu(recipient_phone, namo):
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
-    logging.info(f"User ID: {user_id}")
-    logging.info(f"User name: {namo}")
-    logging.info(f"Recipient phone: {recipient_phone}")
 
     payload = {
         "messaging_product": "whatsapp",

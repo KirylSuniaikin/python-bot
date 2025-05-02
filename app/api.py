@@ -4,9 +4,8 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 
 from app.google_sheets import get_menu_items, get_all_extra_ingr, get_user_id, get_user_phone_by_order_id, \
-    make_order_ready
+    make_order_ready, get_user_info, get_history_orders
 from app.models.models import OrderTO
-from app.services.customer_service import create_update_user
 from app.services.order_service import create_new_order, get_all_active_orders, update_order
 from app.whatsapp import send_ready_message
 
@@ -51,6 +50,8 @@ def create_order():
             items = data["items"]
             payment_type = data.get("payment_type", "")
             order_type = data.get("delivery_method", "Pick Up")
+            notes = data.get("notes", "")
+            logging.info(notes)
 
             order = OrderTO(
                 type=order_type,
@@ -63,8 +64,7 @@ def create_order():
         except KeyError as e:
             return jsonify({"error": f"Missing required field: {e}"}), 400
 
-        logging.info(f"Creating new order: {order}")
-        response = create_new_order(order)
+        response = create_new_order(order, data.get("customer_name"))
         return jsonify(response), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -85,6 +85,8 @@ def edit_order():
             amount_paid = data["amount_paid"]
             items = data["items"]
             payment_type = data.get("payment_type")
+            notes = data.get("notes", "")
+            logging.info("Notes: " + notes)
 
             order = OrderTO(
                 type=data.get("delivery_method", ""),
@@ -92,7 +94,8 @@ def edit_order():
                 user_id=user_id,
                 amount_paid=amount_paid,
                 items=items,
-                payment_type=payment_type
+                payment_type=payment_type,
+                notes=notes
             )
         except KeyError as e:
             return jsonify({"error": f"Missing required field: {e}"}), 400
@@ -132,6 +135,16 @@ def get_active_orders_v1():
         return jsonify({"error": str(e)}), 500
 
 
+@api_blueprint.route("/getHistory", methods=["GET"])
+def get_history():
+    try:
+        history_orders = get_history_orders()
+        return jsonify(history_orders)
+    except Exception as e:
+        logging.exception("Error in get_history")
+        return jsonify({"error": str(e)}), 500
+
+
 @api_blueprint.route("/readyAction", methods=["POST"])
 def ready_action():
     try:
@@ -139,7 +152,6 @@ def ready_action():
         if not order_id:
             return jsonify({"error": "Missing orderId in query params"}), 400
 
-        logging.info(f"📦 Got click for orderId={order_id}")
         recipient_phone = get_user_phone_by_order_id(order_id)
         user_id = get_user_id(recipient_phone)
         send_ready_message(recipient_phone, user_id)
@@ -148,6 +160,20 @@ def ready_action():
         return jsonify({"status": "ok", "message": f"Order {order_id} marked as ready."})
     except Exception as e:
         logging.exception("Error in ready_action")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_blueprint.route("/getUserInfo", methods=["GET"])
+def get_user():
+    try:
+        user_id = request.args.get("userId")
+        if not user_id:
+            return jsonify({"error": "Missing user_id in query params"}), 400
+        user_info = get_user_info(user_id)
+
+        return jsonify(user_info)
+    except Exception as e:
+        logging.exception("Error in get_user_info")
         return jsonify({"error": str(e)}), 500
 
 
@@ -169,19 +195,19 @@ def ready_action():
 #         return jsonify({"error": str(e)}), 500
 
 
-@api_blueprint.route("/createOrUpdateUser", methods=["POST"])
-def createOrUpdateUser():
-    logging.info("Creating or updating user")
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "Invalid request, JSON data required"}), 400
-        tel = data["tel"]
-        order_id = data["order_id"]
-        create_update_user(tel, order_id)
-        return jsonify("response"), 200
-    except KeyError as e:
-        return jsonify({"error": f"Missing required field: {e}"}), 400
+# @api_blueprint.route("/createOrUpdateUser", methods=["POST"])
+# def createOrUpdateUser():
+#     logging.info("Creating or updating user")
+#     try:
+#         data = request.json
+#         if not data:
+#             return jsonify({"error": "Invalid request, JSON data required"}), 400
+#         tel = data["tel"]
+#         order_id = data["order_id"]
+#         create_update_user(tel, order_id)
+#         return jsonify("response"), 200
+#     except KeyError as e:
+#         return jsonify({"error": f"Missing required field: {e}"}), 400
 
 
 @api_blueprint.route("/getAllMenuItems", methods=["GET"])

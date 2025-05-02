@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime
 from typing import List
 
 
@@ -35,6 +34,7 @@ class Order:
     address: str
     amount_paid: float
     payment_type: str
+    notes: str = ""
 
 
 @dataclass
@@ -68,6 +68,7 @@ class OrderTO:
     user_id: str
     items: list[dict]
     payment_type: str
+    notes: str = ""
 
 
 @dataclass
