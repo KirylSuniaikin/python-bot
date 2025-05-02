@@ -17,4 +17,6 @@ def create_app():
     app.register_blueprint(webhook_blueprint, url_prefix="/webhook")
     app.register_blueprint(api_blueprint, url_prefix="/api")
 
+    app.config['SECRET_KEY'] = 'secret!'
+
     return app
