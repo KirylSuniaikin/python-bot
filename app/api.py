@@ -59,7 +59,8 @@ def create_order():
                 user_id=user_id,
                 amount_paid=amount_paid,
                 payment_type=payment_type,
-                items=items
+                items=items,
+                notes=notes
             )
         except KeyError as e:
             return jsonify({"error": f"Missing required field: {e}"}), 400
