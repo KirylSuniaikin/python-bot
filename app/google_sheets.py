@@ -16,7 +16,7 @@ CUSTOMERS_SHEET_ID = 821617987
 EXTRA_INGR_SHEET_ID = 2019426420
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-creds_path = os.path.join(BASE_DIR, "..", "etc/secrets/google_sheets_cred.json")
+creds_path = os.path.join(BASE_DIR, "..", "/etc/secrets/google_sheets_cred.json")
 creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
 client = gspread.authorize(creds)
 drive_service = build("drive", "v3", credentials=creds)
