@@ -16,7 +16,7 @@ CUSTOMERS_SHEET_ID = 821617987
 EXTRA_INGR_SHEET_ID = 2019426420
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-creds_path = os.path.join(BASE_DIR, "..", "/etc/secrets/google_sheets_cred.json")
+creds_path = os.path.join(BASE_DIR, "..", "etc/secrets/google_sheets_cred.json")
 creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
 client = gspread.authorize(creds)
 drive_service = build("drive", "v3", credentials=creds)
@@ -267,6 +267,24 @@ def add_new_user(phone_number, user_name):
         customer.amount_paid,
         customer.last_order
     ])
+
+
+def set_wait_for_name(phone_number, status):
+    data = customers_sheet.get_all_records()
+
+    for index, row in enumerate(data, start=2):
+        if str(row["Telephone No"]).strip() == str(phone_number).strip():
+            customers_sheet.update_cell(index, 8, str(status))
+
+
+def is_wait_for_name(phone_number):
+    data = customers_sheet.get_all_records()
+
+    for row in data:
+        if str(row["Telephone No"]).strip() == str(phone_number).strip():
+            logging.info(row["Waiting For Name"] == "1")
+            return str(row.get("Waiting For Name", "0")).strip() == "1"
+    return False
 
 
 def get_menu_items():

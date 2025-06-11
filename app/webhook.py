@@ -1,8 +1,7 @@
 import logging
 from flask import Blueprint, request, jsonify
-from app.whatsapp import (send_menu, ask_for_name)
-from .google_sheets import add_new_user, user_exists, save_user_name, user_has_name, \
-    get_user_name
+from app.whatsapp import (ask_for_name, send_menu_utility)
+from .google_sheets import add_new_user, user_exists, save_user_name, user_has_name, set_wait_for_name, is_wait_for_name
 
 webhook_blueprint = Blueprint("webhook", __name__)
 
@@ -23,21 +22,28 @@ def webhook():
             sender_phone = value["contacts"][0]["wa_id"]
             message_text = message.get("text", {}).get("body", "").strip()
 
-            if message_text.lower() == "hello":
-                if not user_exists(sender_phone):
-                    add_new_user(sender_phone, "")
-                    logging.info("User was added")
-                    ask_for_name(sender_phone)
-                elif not user_has_name(sender_phone):
-                    logging.info("User exists but has no name")
-                    ask_for_name(sender_phone)
-                else:
-                    logging.info("User exists and has a name")
-                    send_menu(sender_phone, get_user_name(sender_phone))
+            if not user_exists(sender_phone):
+                add_new_user(sender_phone, "")
+                logging.info(f"New user {sender_phone} added")
+                ask_for_name(sender_phone)
+                set_wait_for_name(sender_phone, 1)
+                return jsonify({"status": "asked for name"}), 200
 
-            elif user_exists(sender_phone) and not user_has_name(sender_phone):
+            if is_wait_for_name(sender_phone) and not user_has_name(sender_phone):
+                logging.info(f"User {sender_phone} entered name: {message_text}")
                 save_user_name(sender_phone, message_text)
-                send_menu(sender_phone, get_user_name(sender_phone))
+                set_wait_for_name(sender_phone, 0)
+                send_menu_utility(sender_phone)
+                return jsonify({"status": "name saved, menu sent"}), 200
+
+            if not user_has_name(sender_phone):
+                logging.info(f"Asking {sender_phone} for name again")
+                ask_for_name(sender_phone)
+                set_wait_for_name(sender_phone, 1)
+                return jsonify({"status": "asked for name again"}), 200
+
+            send_menu_utility(sender_phone)
+            return jsonify({"status": "menu sent"}), 200
 
         return jsonify({"status": "success"}), 200
 

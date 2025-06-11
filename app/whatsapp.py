@@ -14,26 +14,6 @@ APP_ID = os.getenv("APP_ID")
 APP_SECRET = os.getenv("APP_SECRET")
 
 
-# def send_order_confirmation(phone_number, sorted_items, total_amount, order_id):
-#     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
-#     headers = {
-#         "Authorization": f"Bearer {ACCESS_TOKEN}",
-#         "Content-Type": "application/json"
-#     }
-#
-#     message_body = build_order_message(order_id, sorted_items, total_amount)
-#     payload = {
-#         "messaging_product": "whatsapp",
-#         "recipient_type": "individual",
-#         "to": phone_number,
-#         "type": "text",
-#         "text": {"body": message_body}
-#     }
-#
-#     response = requests.post(url, json=payload, headers=headers)
-#     logging.info(f"Sent order confirmation to {phone_number}: {response.status_code}, Response: {response.text}")
-
-
 def build_order_message(order_id, sorted_items, total_amount):
     order_summary_lines = []
 
@@ -293,19 +273,9 @@ def send_ready_message(recipient_phone, user_id):
         "to": recipient_phone,
         "type": "template",
         "template": {
-            "name": "ready_message2",
+            "name": "last_confirm",
             "language": {"code": "en"},
             "components": [
-                {
-                    "type": "HEADER",
-                    "parameters": [
-                        {
-                            "type": "text",
-                            "parameter_name": "text",
-                            "text": f"Thank you, {user_name}! Enjoy your food🤌"
-                        }
-                    ]
-                },
                 {
                     "type": "BODY",
                     "parameters": [
@@ -319,7 +289,7 @@ def send_ready_message(recipient_phone, user_id):
                 {
                     "type": "BUTTON",
                     "sub_type": "url",
-                    "index": 1,
+                    "index": 0,
                     "parameters": [
                         {
                             "type": "text",
@@ -336,10 +306,8 @@ def send_ready_message(recipient_phone, user_id):
     return response
 
 
-def send_menu(recipient_phone, namo):
+def send_menu_utility(recipient_phone):
     user_id = get_user_id(recipient_phone)
-    if namo is None:
-        namo = "Habibi"
     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
@@ -352,7 +320,7 @@ def send_menu(recipient_phone, namo):
         "to": recipient_phone,
         "type": "template",
         "template": {
-            "name": "send_menu2",
+            "name": "name_confirmed22",
             "language": {"code": "en"},
             "components": [
                 {
@@ -360,8 +328,7 @@ def send_menu(recipient_phone, namo):
                     "parameters": [
                         {
                             "type": "text",
-                            "parameter_name": "header",
-                            "text": f"{namo}🤝"
+                            "text": "Habibi! Order through the website I shared 🚀"
                         }
                     ]
                 },
@@ -370,8 +337,7 @@ def send_menu(recipient_phone, namo):
                     "parameters": [
                         {
                             "type": "text",
-                            "parameter_name": "smiles",
-                            "text": "🍕🥤"
+                            "text": "even my grandma can do it! 😄🍕"
                         }
                     ]
                 },
@@ -407,9 +373,9 @@ def ask_for_name(recipient_phone):
         "type": "text",
         "text": {
             "body": "Salam Aleikum 👋!\n"
-                    "I’m Hamood, IC Pizza Bot 🤖, your friendly assistant to make ordering super easy and fast!\n"
-                    "Glad to have you here!\n"
-                    "What’s your name? 😊"
+                    "I'm Hamoody, IC Pizza Bot 🤖\n"
+                    "Send me your name so I can share the menu with you 🍕\n"
+
         }
     }
 
