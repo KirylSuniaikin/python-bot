@@ -69,7 +69,7 @@ def create_new_order(order: OrderTO, name):
         add_new_order_item(new_item)
     if telephone_no != "Unknown customer":
         update_user_info(new_order, name)
-        send_order_confirmation(telephone_no, sorted_items, order.amount_paid, name)
+        send_order_confirmation(telephone_no, sorted_items, order.amount_paid, order_no)
     data = build_order_payload(new_order, items, name)
     emit_order_created(data)
     send_order_to_kitchen_text2(order_no, sorted_items, order.amount_paid, telephone_no, False)
