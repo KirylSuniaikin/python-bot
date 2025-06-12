@@ -328,7 +328,7 @@ def send_menu_utility(recipient_phone):
                     "parameters": [
                         {
                             "type": "text",
-                            "text": "Habibi! Order through the website I shared 🚀"
+                            "text": "Habibi, order online, it's quick & super easy! 🍕"
                         }
                     ]
                 },
@@ -337,7 +337,7 @@ def send_menu_utility(recipient_phone):
                     "parameters": [
                         {
                             "type": "text",
-                            "text": "even my grandma can do it! 😄🍕"
+                            "text": "Tested on my grandma😄"
                         }
                     ]
                 },
