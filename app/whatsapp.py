@@ -2,8 +2,7 @@ import logging
 from dotenv import load_dotenv
 import requests
 import os
-
-from app.google_sheets import get_user_id, get_user_name
+from app.repositories.repository import get_user_id
 
 load_dotenv()
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
@@ -69,18 +68,18 @@ Thank you! See you soon! 🍕
     return message_body
 
 
-def send_order_confirmation(telephone_no, sorted_items, total_amount, order_id):
+def send_order_confirmation(telephone_no, message_body, total_amount, order_id):
     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
-    message_body = build_kitchen_message(sorted_items)
 
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": telephone_no,
+        # "to": telephone_no,
+        "to": "48512066441",
         "type": "template",
         "template": {
             "name": "order_confirm",
@@ -123,22 +122,20 @@ def send_order_confirmation(telephone_no, sorted_items, total_amount, order_id):
         raise
 
 
-def send_order_to_kitchen_text2(order_id, sorted_items, total_amount, telephone_no, isEdit):
-    logging.info(f"Sending order to kitchen: {order_id}, items: {sorted_items}, total: {total_amount}")
+def send_order_to_kitchen_text2(order_id, message_body, telephone_no, isEdit, name):
+    # logging.info(f"Sending order to kitchen: {order_id}, items: {sorted_items}, total: {total_amount}")
     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
-    message_body = build_kitchen_message(sorted_items)
-    user_name = get_user_name(telephone_no)
     header = f"{'✅ New order:' if not isEdit else '✏️ Order'} {order_id}{' updated!' if isEdit else '!'}"
 
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": "97333607710",
-        # "to": "48512066441",
+        # "to": "97333607710",
+        "to": "48512066441",
         "type": "template",
         "template": {
             "name": "order_info2",
@@ -160,7 +157,7 @@ def send_order_to_kitchen_text2(order_id, sorted_items, total_amount, telephone_
                         {
                             "type": "text",
                             "parameter_name": "client_info",
-                            "text": f"{telephone_no} ({user_name})"
+                            "text": f"{telephone_no} ({name})"
                         },
                         {
                             "type": "text",
@@ -180,71 +177,70 @@ def send_order_to_kitchen_text2(order_id, sorted_items, total_amount, telephone_
         logging.exception(f"Failed to send order to kitchen {e}")
         raise
 
-
-def send_info_to_kitchen(order_id):
-    url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": "97333607710",
-        # "to": "48512066441",
-        "type": "template",
-        "template": {
-            "name": "send_to_kitchen4",
-            "language": {"code": "en"},
-            "components": [
-                {
-                    "type": "HEADER",
-                    "parameters": [
-                        {
-                            "type": "text",
-                            "parameter_name": "header",
-                            "text": f"Order {order_id}!"
-                        }
-                    ]
-                },
-                {
-                    "type": "BODY",
-                    "parameters": [
-                        {
-                            "type": "text",
-                            "parameter_name": "id",
-                            "text": f"{order_id}"
-                        }
-                    ]
-                },
-                {
-                    "type": "BUTTON",
-                    "sub_type": "url",
-                    "index": 0,
-                    "parameters": [
-                        {
-                            "type": "text",
-                            "text": str(order_id)
-                        }
-                    ]
-                }
-            ]
-        }
-    }
-
-    response = requests.post(url, json=payload, headers=headers)
-    logging.info(f"Sent info to kitchen : {response.status_code}, Response: {response.text}")
-    return response
+# def send_info_to_kitchen(order_id):
+#     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
+#     headers = {
+#         "Authorization": f"Bearer {ACCESS_TOKEN}",
+#         "Content-Type": "application/json"
+#     }
+#     payload = {
+#         "messaging_product": "whatsapp",
+#         "recipient_type": "individual",
+#         # "to": "97333607710",
+#         "to": "48512066441",
+#         "type": "template",
+#         "template": {
+#             "name": "send_to_kitchen4",
+#             "language": {"code": "en"},
+#             "components": [
+#                 {
+#                     "type": "HEADER",
+#                     "parameters": [
+#                         {
+#                             "type": "text",
+#                             "parameter_name": "header",
+#                             "text": f"Order {order_id}!"
+#                         }
+#                     ]
+#                 },
+#                 {
+#                     "type": "BODY",
+#                     "parameters": [
+#                         {
+#                             "type": "text",
+#                             "parameter_name": "id",
+#                             "text": f"{order_id}"
+#                         }
+#                     ]
+#                 },
+#                 {
+#                     "type": "BUTTON",
+#                     "sub_type": "url",
+#                     "index": 0,
+#                     "parameters": [
+#                         {
+#                             "type": "text",
+#                             "text": str(order_id)
+#                         }
+#                     ]
+#                 }
+#             ]
+#         }
+#     }
+#
+#     response = requests.post(url, json=payload, headers=headers)
+#     logging.info(f"Sent info to kitchen : {response.status_code}, Response: {response.text}")
+#     return response
 
 
 def build_kitchen_message(sorted_items):
     order_parts = []
 
     for item in sorted_items:
-        quantity = item.get("quantity", 1)
-        name = item["name"].strip()
-        size = item.get("size", "").strip()
-        desc = item.get("description", "").strip()
+        quantity = item["quantity"]
+        name = item["name"]
+        size = item["size"]
+        desc = item.get("description", "")
 
         details = [x.strip() for x in desc.split("+") if x.strip() and x.strip() != "'"]
         desc_text = f" ({' + '.join(details)})" if details else ""
@@ -253,12 +249,10 @@ def build_kitchen_message(sorted_items):
         order_parts.append(part)
 
     order_items_text = " | ".join(order_parts)
-
     return order_items_text
 
 
-def send_ready_message(recipient_phone, user_id):
-    user_name = get_user_name(recipient_phone)
+def send_ready_message(recipient_phone, user_name, user_id):
     if user_name is None:
         user_name = "Habibi"
     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
@@ -270,7 +264,8 @@ def send_ready_message(recipient_phone, user_id):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": recipient_phone,
+        # "to": recipient_phone,
+        "to": "420601053179",
         "type": "template",
         "template": {
             "name": "last_confirm",
@@ -317,7 +312,8 @@ def send_menu_utility(recipient_phone):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": recipient_phone,
+        # "to": recipient_phone,
+        "to": "48512066441",
         "type": "template",
         "template": {
             "name": "name_confirmed22",
@@ -369,7 +365,8 @@ def ask_for_name(recipient_phone):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": recipient_phone,
+        # "to": recipient_phone,
+        "to": "48512066441",
         "type": "text",
         "text": {
             "body": "Salam Aleikum 👋!\n"

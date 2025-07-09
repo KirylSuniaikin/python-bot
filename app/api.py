@@ -1,13 +1,14 @@
 import logging
-
-from flask import Blueprint, request, jsonify
+import threading
+from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
 
-from app.google_sheets import get_menu_items, get_all_extra_ingr, get_user_id, get_user_phone_by_order_id, \
-    make_order_ready, get_user_info, get_history_orders
 from app.models.models import OrderTO
-from app.services.order_service import create_new_order, get_all_active_orders, update_order
-from app.whatsapp import send_ready_message
+from app.repositories.repository import make_order_ready, get_history_orders, get_user_info, \
+    update_menu_tems_availability, update_dough_availability, update_brick_pizza_availability, update_payment
+from app.services.cache import load_menu_cache, load_extra_ingr_cache
+from app.services.order_service import create_new_order, get_all_active_orders, update_order, \
+    async_ready_order_post_processing
 
 api_blueprint = Blueprint("api", __name__)
 
@@ -42,7 +43,6 @@ def create_order():
         data = request.json
         if not data:
             return jsonify({"error": "Invalid request, JSON data required"}), 400
-
         try:
             tel = data.get("tel")
             user_id = data.get("user_id")
@@ -51,7 +51,6 @@ def create_order():
             payment_type = data.get("payment_type", "")
             order_type = data.get("delivery_method", "Pick Up")
             notes = data.get("notes", "")
-            logging.info(notes)
 
             order = OrderTO(
                 type=order_type,
@@ -80,7 +79,7 @@ def edit_order():
             return jsonify({"error": "Invalid request, JSON data required"}), 400
 
         try:
-            order_id = request.args.get("orderId")
+            id = request.args.get("id")
             tel = data.get("tel")
             user_id = data.get("user_id")
             amount_paid = data["amount_paid"]
@@ -90,9 +89,12 @@ def edit_order():
             logging.info("Notes: " + notes)
 
             order = OrderTO(
+                id=int(id),
                 type=data.get("delivery_method", ""),
+                order_no=data.get("order_no"),
                 tel=tel,
                 user_id=user_id,
+                address=data.get("address"),
                 amount_paid=amount_paid,
                 items=items,
                 payment_type=payment_type,
@@ -101,33 +103,15 @@ def edit_order():
         except KeyError as e:
             return jsonify({"error": f"Missing required field: {e}"}), 400
 
-        logging.info(f"Updating order with id: {order_id}")
-        response = update_order(order, order_id)
+        response = update_order(order)
         return jsonify(response), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# @api_blueprint.route("/sendReadeMessage", methods=["POST"])
-# def ready_message():
-#     try:
-#         data = request.json
-#         if not data:
-#             return jsonify({"error": "Invalid request, JSON data required"}), 400
-#
-#         try:
-#             tel = data["tel"]
-#             logging.info(f"Sending ready message to: {tel}")
-#             response = send_ready_message(tel, get_user_id(tel))
-#         except KeyError as e:
-#             return jsonify({"error": f"Missing required field: {e}"}), 400
-#
-#         return jsonify(response), 200
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-
 @api_blueprint.route("/getAllActiveOrders", methods=["GET"])
-def get_active_orders_v1():
+def get_all_active_orders_v1():
+    print("lol")
     try:
         active_orders = get_all_active_orders()
         return jsonify(active_orders)
@@ -145,18 +129,30 @@ def get_history():
         logging.exception("Error in get_history")
         return jsonify({"error": str(e)}), 500
 
+@api_blueprint.route('/updatePaymentType', methods=['POST'])
+def update_payment_type():
+    data = request.json
+    order_id = data.get('order_id')
+    new_payment_type = data.get('payment_type')
+
+    if not order_id or not new_payment_type:
+        return jsonify({"error": "Missing order_id or payment_type"}), 400
+    update_payment(order_id, new_payment_type)
+
+    return jsonify({"status": "ok", "message": "Payment type updated successfully"})
+
 
 @api_blueprint.route("/readyAction", methods=["POST"])
 def ready_action():
     try:
-        order_id = request.args.get("orderId")
+        order_id = request.args.get("id")
         if not order_id:
             return jsonify({"error": "Missing orderId in query params"}), 400
 
-        recipient_phone = get_user_phone_by_order_id(order_id)
-        user_id = get_user_id(recipient_phone)
-        send_ready_message(recipient_phone, user_id)
-        make_order_ready(order_id)
+        order = make_order_ready(order_id)
+        if order.telephone_no is not None and order.telephone_no != "Unknown customer":
+            appctx = current_app.app_context()
+            threading.Thread(target=async_ready_order_post_processing, args=(appctx, order)).start()
 
         return jsonify({"status": "ok", "message": f"Order {order_id} marked as ready."})
     except Exception as e:
@@ -164,18 +160,27 @@ def ready_action():
         return jsonify({"error": str(e)}), 500
 
 
-@api_blueprint.route("/getUserInfo", methods=["GET"])
-def get_user():
-    try:
-        user_id = request.args.get("userId")
-        if not user_id:
-            return jsonify({"error": "Missing user_id in query params"}), 400
-        user_info = get_user_info(user_id)
+@api_blueprint.route('/updateAvailability', methods=['POST'])
+def update_availability():
+    data = request.json
+    changes = data.get('changes', [])
 
-        return jsonify(user_info)
-    except Exception as e:
-        logging.exception("Error in get_user_info")
-        return jsonify({"error": str(e)}), 500
+    for change in changes:
+        type_ = change.get('type')
+        name_or_dough = change.get('name')
+        enabled = change.get('enabled', True)
+
+        if type_ == 'group':
+            update_menu_tems_availability(name_or_dough, enabled)
+        elif type_ == 'dough':
+            if name_or_dough == "Brick dough":
+                update_brick_pizza_availability(enabled)
+            else:
+                update_dough_availability(name_or_dough, enabled)
+    current_app.menu_cache = []
+    current_app.extra_ingr_cache = []
+
+    return jsonify({"status": "ok", "message": "Availability updated successfully"})
 
 
 # @api_blueprint.route("/generateCheck", methods=["POST"])
@@ -196,31 +201,24 @@ def get_user():
 #         return jsonify({"error": str(e)}), 500
 
 
-# @api_blueprint.route("/createOrUpdateUser", methods=["POST"])
-# def createOrUpdateUser():
-#     logging.info("Creating or updating user")
-#     try:
-#         data = request.json
-#         if not data:
-#             return jsonify({"error": "Invalid request, JSON data required"}), 400
-#         tel = data["tel"]
-#         order_id = data["order_id"]
-#         create_update_user(tel, order_id)
-#         return jsonify("response"), 200
-#     except KeyError as e:
-#         return jsonify({"error": f"Missing required field: {e}"}), 400
-
-
-@api_blueprint.route("/getAllMenuItems", methods=["GET"])
+@api_blueprint.route("/getBaseAppInfo", methods=["GET"])
 @cross_origin()
-def get_menu():
-    menu_items = get_menu_items()
-    return jsonify([item.__dict__ for item in menu_items])
+def get_base_app_info():
+    user_id = request.args.get("userId")
 
+    if not hasattr(current_app, "menu_cache") or not current_app.menu_cache:
+        load_menu_cache()
+    if not hasattr(current_app, "extra_ingr_cache") or not current_app.extra_ingr_cache:
+        load_extra_ingr_cache()
+    response = {
+        "menu": current_app.menu_cache,
+        "extraIngr": current_app.extra_ingr_cache
+    }
+    if user_id:
+        userInfo = get_user_info(user_id)
+        response["userInfo"] = {
+            "name": userInfo["name"] or "Unknown user",
+            "phone": userInfo["phone"]
+        }
 
-@api_blueprint.route("/getAllExtraIngr", methods=["GET"])
-@cross_origin()
-def get_extra_ingr():
-    extra_ingr = get_all_extra_ingr()
-    return jsonify([item.__dict__ for item in extra_ingr])
-
+    return jsonify(response)

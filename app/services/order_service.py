@@ -1,28 +1,27 @@
 import logging
 import random
-import uuid
+import threading
 import pytz
 from datetime import datetime
-from app.google_sheets import add_new_order, add_new_order_item, get_user_phone_number, update_user_info, user_exists, \
-    add_new_user, get_active_orders, delete_order_info, edit_user_info, \
-    menu_items_sheet, ger_photo_url_by_name_for_current_menu
 from app.models.models import OrderTO, Order, OrderItem
+from app.repositories.repository import is_user_exist, add_new_user, create_order, create_new_items, update_customer, \
+    get_customer_by_id, get_active_orders, update_order_transaction
 from app.socketio import emit_order_created
-from app.whatsapp import send_order_confirmation, send_info_to_kitchen, \
-    send_order_to_kitchen_text2
+from app.whatsapp import send_order_confirmation, send_order_to_kitchen_text2, build_kitchen_message, send_ready_message
+from flask import current_app
 
 
 def create_new_order(order: OrderTO, name):
-    year_suffix = str(datetime.now(pytz.timezone("Asia/Bahrain")).year)[-2:]
-    random_digits = str(random.randint(1000, 9999))
-    order_no = f"a{year_suffix}{random_digits}"
-
+    telephone_no = None
     if order.tel:
         telephone_no = order.tel
-        if not user_exists(telephone_no):
+        if not is_user_exist(telephone_no):
             add_new_user(telephone_no, name)
     else:
-        telephone_no = get_user_phone_number(order.user_id) or "Unknown customer"
+        customer = get_customer_by_id(order.user_id)
+        if customer:
+            telephone_no = customer.telephone_no
+            name = customer.name
 
     address = ""
     order_items = order.items
@@ -30,17 +29,18 @@ def create_new_order(order: OrderTO, name):
 
     sorted_items = sorted(order_items, key=lambda x: ["Combo Deals", "Brick Pizzas", "Pizzas", "Sides", "Sauces", "Beverages"].index(x["category"]))
     new_order = Order(
-        order_no=order_no,
+        id=random.randint(1, 99999999),
+        order_no=random.randint(1, 999),
         telephone_no=telephone_no,
         status="Kitchen Phase",
-        date_and_time=datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M"),
+        created_at=datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M"),
         type=order.type,
-        address=address,
         amount_paid=order.amount_paid,
         payment_type=order.payment_type,
         notes=order.notes,
+        address=address
     )
-    add_new_order(new_order)
+    create_order(new_order)
 
     for item in sorted_items:
         discount_raw = item.get("discount_amount", 0.0)
@@ -53,113 +53,130 @@ def create_new_order(order: OrderTO, name):
         is_garlic_crust = item.get("isGarlicCrust", False) if category in ["Pizzas", "Combo Deals"] else False
         is_thin_dough = item.get("isThinDough", False) if category in ["Pizzas", "Combo Deals"] else False
         new_item = OrderItem(
-            order_no=order_no,
-            id=str(uuid.uuid4())[:8],
+            order_id=new_order.id,
+            id=random.randint(1, 99999999),
             name=item["name"],
             quantity=item["quantity"],
             amount=item["amount"],
             size=item.get("size", ""),
             category=category,
-            isGarlicCrust=is_garlic_crust,
-            isThinDough=is_thin_dough,
+            is_garlic_crust=is_garlic_crust,
+            is_thin_dough=is_thin_dough,
             description=description,
-            sale_amount=discount_amount,
+            discount_amount=discount_amount,
         )
         items.append(new_item)
-        add_new_order_item(new_item)
-    if telephone_no != "Unknown customer":
-        update_user_info(new_order, name)
-        send_order_confirmation(telephone_no, sorted_items, order.amount_paid, order_no)
-    data = build_order_payload(new_order, items, name)
-    emit_order_created(data)
-    send_order_to_kitchen_text2(order_no, sorted_items, order.amount_paid, telephone_no, False)
-    send_info_to_kitchen(order_no)
+    dict_items = create_new_items(items)
+    appctx = current_app.app_context()
+    threading.Thread(target=async_new_order_post_processing, args=(appctx, new_order, new_order.telephone_no, dict_items, name)).start()
 
     return {
         "status": "success",
-        "order_no": order_no,
+        "order_no": new_order.id,
         "message": "Order created successfully"
     }
 
+def async_new_order_post_processing(appctx, order, telephone_no, sorted_items, name):
+    with appctx:
+        message_body = build_kitchen_message(sorted_items)
+        if telephone_no and telephone_no != "Unknown customer":
+            update_customer(order)
+            send_order_confirmation(telephone_no, message_body, order.amount_paid, order.id)
+        data = build_order_payload(order, sorted_items, name)
+        emit_order_created(data)
+        send_order_to_kitchen_text2(order.order_no, message_body, telephone_no, False, name)
+        # send_info_to_kitchen(order.order_no)
 
-def build_order_payload(order: Order, items: list[OrderItem], user_name: str) -> dict:
-    menu = menu_items_sheet.get_all_records()
+def async_ready_order_post_processing(appctx, order):
+    with appctx:
+        send_ready_message(order.telephone_no, order.customer.name, order.customer.id)
+
+def build_order_payload(order: Order, items: list, user_name: str) -> dict:
     return {
         "orderId": order.order_no,
         "order_type": order.type,
         "amount_paid": order.amount_paid,
         "phone_number": order.telephone_no,
-        "sale_amount": round(sum(i.sale_amount or 0 for i in items), 2),
+        "discount_amount": round(sum(i.get("discount_amount", 0.0) or 0.0 for i in items), 2),
         "customer_name": user_name,
-        "order_created": order.date_and_time,
+        "order_created": order.created_at,
         "payment_type": order.payment_type,
         "notes": order.notes,
         "items": [
             {
-                "name": i.name,
-                "quantity": i.quantity,
-                "amount": i.amount,
-                "size": i.size,
-                "category": i.category,
-                "isGarlicCrust": i.isGarlicCrust,
-                "isThinDough": i.isThinDough,
-                "description": i.description,
-                "discount_amount": i.sale_amount,
-                "photo": ger_photo_url_by_name_for_current_menu(i.name, menu),
+                "name": i["name"],
+                "quantity": i["quantity"],
+                "amount": i["amount"],
+                "size": i.get("size", ""),
+                "category": i.get("category", ""),
+                "is_garlic_crust": i.get("is_garlic_crust", False),
+                "is_thin_dough": i.get("is_thin_dough", False),
+                "description": i.get("description", ""),
+                "discount_amount": i.get("discount_amount", 0.0),
+                "photo": i.get("photo", ""),
             }
             for i in items
         ]
     }
 
 
-def update_order(order: OrderTO, order_id: str):
+def update_order(order: OrderTO):
+    order_info = update_order_transaction(order)
+    print("lol22")
+    if not order_info:
+        logging.warning("Order update failed; skipping post-processing.")
+        return
+    if order.tel and order.tel != "Unknown customer":
+        print("lol")
+        sorted_items = order_info.get("sorted_items", [])
+        customer_name = order_info.get("customer_name", "no name")
 
-    phone_no = edit_user_info(order, order_id)
-    delete_order_info(order_id)
-
-    address = ""
-    order_items = order.items
-
-    sorted_items = sorted(order_items, key=lambda x: ["Combo Deals", "Brick Pizzas", "Pizzas", "Sides", "Sauces", "Beverages"].index(x["category"]))
-
-    new_order = Order(
-        order_no=order_id,
-        telephone_no=phone_no,
-        status="Kitchen Phase",
-        date_and_time=datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M"),
-        type=order.type,
-        address=address,
-        amount_paid=order.amount_paid,
-        payment_type=order.payment_type,
-        notes=order.notes,
-    )
-    add_new_order(new_order)
-    logging.info(f"New Items: {sorted_items}")
-    for item in sorted_items:
-        category = item["category"]
-        description = item.get("description", "")
-        is_garlic_crust = item.get("isGarlicCrust", False) if category in ["Pizzas", "Combo Deals"] else False
-        is_thin_dough = item.get("isThinDough", False) if category in ["Pizzas", "Combo Deals"] else False
-
-        new_item = OrderItem(
-            order_no=order_id,
-            id=str(uuid.uuid4())[:8],
-            name=item["name"],
-            quantity=item["quantity"],
-            amount=item["amount"],
-            size=item.get("size", ""),
-            category=category,
-            isGarlicCrust=is_garlic_crust,
-            isThinDough=is_thin_dough,
-            description=description,
-            sale_amount=item["discount_amount"],
-        )
-        add_new_order_item(new_item)
-    send_order_to_kitchen_text2(order_id, sorted_items, order.amount_paid, phone_no, True)
-
-    # send_edit_order_confirmation(telephone_no, sorted_items, order.amount_paid, order_no)
-    # send_edit_order_to_kitchen_text2(order_no, sorted_items, order.amount_paid, telephone_no)
-    # send_edit_info_to_kitchen(order_no)
+        appctx = current_app.app_context()
+        threading.Thread(target=async_update_order_post_processing, args=(appctx, order, sorted_items, customer_name)).start()
 
 
-def get_all_active_orders(): return get_active_orders()
+def async_update_order_post_processing(appctx, order: OrderTO, sorted_items, customer_name):
+    with appctx:
+        message_body = build_kitchen_message(sorted_items)
+        send_order_to_kitchen_text2(order.id, message_body, order.tel, True, customer_name)
+
+
+def get_all_active_orders():
+    orders = get_active_orders()
+
+    active_orders = []
+    for order in orders:
+        customer_name = order.customer.name if order.customer and order.customer.name else None
+
+        items = []
+        print(order.items)
+        for item in order.items:
+            items.append({
+                "name": item.name,
+                "quantity": item.quantity,
+                "amount": item.amount,
+                "size": item.size,
+                "category": item.category,
+                "isGarlicCrust": item.is_garlic_crust,
+                "isThinDough": item.is_thin_dough,
+                "description": item.description,
+                "discount_amount": item.discount_amount or 0,
+                "photo": next((m["photo"] for m in current_app.menu_cache if m["name"] == item.name), "")
+            })
+
+        active_orders.append({
+            "id": order.id,
+            "order_no": order.order_no,
+            "order_type": order.type,
+            "amount_paid": order.amount_paid,
+            "phone_number": order.telephone_no,
+            "address": order.address,
+            "sale_amount": round(sum(i["discount_amount"] for i in items), 2),
+            "customer_name": customer_name,
+            "order_created": order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
+            "payment_type": order.payment_type,
+            "notes": order.notes or "Empty Note",
+            "items": items
+        })
+
+    return {"orders": active_orders}

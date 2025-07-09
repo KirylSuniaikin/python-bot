@@ -1,0 +1,304 @@
+import logging
+import random
+from datetime import datetime, timedelta
+import pytz
+from flask import current_app
+
+from app.conf.db_conf import db
+from app.models.models import Order, OrderItem, Customer, MenuItem, OrderTO, ExtraIngr
+
+
+##########
+#ORDERS
+##########
+
+def create_order(order: Order):
+    db.session.add(order)
+    db.session.commit()
+
+def update_payment(id, type):
+    Order.query.filter_by(id=id).update({'payment_type': type})
+    db.session.commit()
+
+def get_active_orders():
+    query = (
+        db.session.query(Order)
+        .filter(Order.status != "Ready")
+        .options(
+            db.joinedload(Order.items),
+            db.joinedload(Order.customer)
+        )
+    )
+    return query.all()
+
+
+def update_order_transaction(order: OrderTO):
+    with db.session.begin():
+        # Step 1: Get old order
+        old_order = Order.query.filter_by(id=order.id).first()
+        if not old_order:
+            logging.warning(f"Order with ID {order.id} not found.")
+            return
+
+        old_amount_paid = old_order.amount_paid
+
+        customer = None
+        if order.tel:
+            # Step 2: Update customer
+            customer = Customer.query.filter_by(telephone_no=old_order.telephone_no).first()
+            if not customer:
+                logging.warning(f"User with phone {old_order.telephone_no} not found.")
+                return
+
+            customer.amount_paid = customer.amount_paid - old_amount_paid + order.amount_paid
+            customer.last_order = datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M")
+
+            logging.info(f"User {customer.telephone_no} updated after order edit. Old paid: {old_amount_paid}, New paid: {order.amount_paid}, Total: {customer.amount_paid}")
+
+        # Step 3: Update order fields
+        old_order.address = order.address
+        old_order.amount_paid = order.amount_paid
+        old_order.payment_type = order.payment_type
+        old_order.notes = order.notes
+
+        # Step 4: Delete old items
+        OrderItem.query.filter_by(order_id=old_order.id).delete()
+
+        # Step 5: Add new items
+        items = []
+        sorted_items = sorted(order.items, key=lambda x: ["Combo Deals", "Brick Pizzas", "Pizzas", "Sides", "Sauces", "Beverages"].index(x["category"]))
+
+        for item in sorted_items:
+            category = item["category"]
+            description = item.get("description", "")
+            is_garlic_crust = item.get("isGarlicCrust", False) if category in ["Pizzas", "Combo Deals"] else False
+            is_thin_dough = item.get("isThinDough", False) if category in ["Pizzas", "Combo Deals"] else False
+
+            new_item = OrderItem(
+                order_id=old_order.id,
+                id=random.randint(1, 99999999),
+                name=item["name"],
+                quantity=item["quantity"],
+                amount=item["amount"],
+                size=item.get("size", ""),
+                category=category,
+                is_garlic_crust=is_garlic_crust,
+                is_thin_dough=is_thin_dough,
+                description=description,
+                discount_amount=item.get("discount_amount", 0.0),
+            )
+            items.append(new_item)
+
+        db.session.add_all(items)
+
+        logging.info(f"Order {old_order.id} updated successfully with new items.")
+    return {
+        "sorted_items": sorted_items,
+        "customer_name": customer.name if customer else None
+    }
+
+def get_history_orders():
+    bahrain_tz = pytz.timezone("Asia/Bahrain")
+    now = datetime.now(bahrain_tz)
+    cutoff_time = now - timedelta(days=1)
+
+    orders = (
+        Order.query
+        .filter(Order.status == "Ready", Order.created_at >= cutoff_time)
+        .all()
+    )
+
+    history_orders = []
+    for order in orders:
+        items = []
+        for item in order.items:
+            try:
+                items.append({
+                    "name": item.name,
+                    "quantity": item.quantity,
+                    "amount": item.amount,
+                    "size": item.size,
+                    "category": item.category,
+                    "isGarlicCrust": item.is_garlic_crust,
+                    "isThinDough": item.is_thin_dough,
+                    "description": item.description,
+                    "discount_amount": item.discount_amount,
+                    "photo": next((m["photo"] for m in current_app.menu_cache if m["name"] == item.name), ""),
+                })
+            except Exception as e:
+                print(f"Ошибка при обработке item: {item.name}, {e}")
+
+        history_orders.append({
+            "id": order.id,
+            "order_no": order.order_no,
+            "order_type": order.type,
+            "amount_paid": order.amount_paid,
+            "phone_number": order.telephone_no,
+            "sale_amount": round(sum(i["discount_amount"] or 0 for i in items), 2),
+            "customer_name": order.customer.name if order.customer and order.customer.name else "Unknown customer",
+            "order_created": order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
+            "payment_type": order.payment_type,
+            "notes": order.notes or "Test note",
+            "items": items
+        })
+
+    logging.info(history_orders)
+    return {"orders": history_orders}
+
+
+def make_order_ready(order_id):
+    order = Order.query.filter_by(id=order_id).first()
+    if not order:
+        logging.error(f"Order {order_id} not found")
+        return
+
+    order.status = "Ready"
+    db.session.commit()
+    return order
+
+
+##########
+#ORDER_ITEMS
+##########
+
+def create_new_items(items: [OrderItem]):
+    db.session.add_all(items)
+    db.session.commit()
+    item_dicts = []
+    for item in items:
+        item_dicts.append({
+            "id": item.id,
+            "name": item.name,
+            "quantity": item.quantity,
+            "amount": item.amount,
+            "size": item.size,
+            "category": item.category,
+            "is_garlic_crust": item.is_garlic_crust,
+            "is_thin_dough": item.is_thin_dough,
+            "description": item.description,
+            "discount_amount": item.discount_amount,
+        })
+
+    return item_dicts
+
+
+
+##########
+#MENU_ITEMS
+##########
+
+def get_menu_items():
+    return MenuItem.query.all()
+
+def update_menu_tems_availability(name, enabled):
+    MenuItem.query.filter_by(name=name).update({'available': enabled})
+    db.session.commit()
+
+def update_dough_availability(size, enabled):
+    MenuItem.query.filter_by(size=size).update({'available': enabled})
+    db.session.commit()
+
+def update_brick_pizza_availability(enabled):
+    MenuItem.query.filter_by(category="Brick Pizzas").update({'available': enabled})
+    db.session.commit()
+
+
+##########
+#MENU_ITEMS
+##########
+
+def get_extra_ingr():
+    return ExtraIngr.query.all()
+
+
+
+##########
+#CUSTOMERS
+##########
+
+def update_customer(order):
+    customer = Customer.query.filter_by(telephone_no=order.telephone_no).first()
+
+    if not customer:
+        print(f"User with phone {order.telephone_no} not found")
+        return
+
+    customer.amount_of_orders += 1
+    customer.amount_paid += order.amount_paid
+    customer.amount_paid = round(customer.amount_paid, 3)
+    customer.last_order = datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M")
+
+    db.session.commit()
+
+    print(f"User {order.telephone_no} updated: orders={customer.amount_of_orders}, paid={customer.amount_paid}, last_order={customer.last_order}")
+
+
+def is_user_exist(tel):
+    return db.session.query(Customer.id).filter_by(telephone_no=tel).first() is not None
+
+
+def add_new_user(telephone_no, name):
+    new_customer = Customer(
+        id=random.randint(1, 99999999),
+        telephone_no=telephone_no,
+        name=name,
+        address="",
+        amount_of_orders=0,
+        amount_paid=0.0,
+        last_order=None,
+        waiting_for_name=None
+    )
+    db.session.add(new_customer)
+    db.session.commit()
+
+
+def get_customer_by_id(user_id):
+    return Customer.query.filter_by(id=user_id).first()
+
+def get_user_id(phone_number):
+    customer = Customer.query.filter_by(telephone_no=phone_number).first()
+    if customer:
+        return customer.id
+    return None
+
+def set_wait_for_name(phone_number, status):
+    customer = Customer.query.filter_by(telephone_no=phone_number).first()
+    if customer:
+        customer.waiting_for_name = int(status)
+        db.session.commit()
+
+def is_wait_for_name(phone_number):
+    customer = Customer.query.filter_by(telephone_no=phone_number).first()
+    if customer:
+        is_waiting = customer.waiting_for_name == 1
+        return is_waiting
+    return False
+
+def save_user_name(phone_number, name):
+    customer = Customer.query.filter_by(telephone_no=phone_number).first()
+    if customer:
+        customer.name = name
+        db.session.commit()
+
+def user_exists(phone_number):
+    return Customer.query.filter_by(telephone_no=phone_number).first() is not None
+
+def user_has_name(phone_number):
+    customer = Customer.query.filter_by(telephone_no=phone_number).first()
+    if customer:
+        has_name = bool(customer.name and customer.name.strip())
+        return has_name
+    return False
+
+
+def get_user_info(user_id):
+    customer = Customer.query.filter_by(id=user_id).first()
+    if customer:
+        return {
+            "phone": customer.telephone_no,
+            "name": customer.name
+        }
+    return {
+        "phone": None,
+        "name": None
+    }
