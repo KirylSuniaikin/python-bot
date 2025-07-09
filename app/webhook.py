@@ -1,7 +1,8 @@
 import logging
 from flask import Blueprint, request, jsonify
 from app.whatsapp import (ask_for_name, send_menu_utility)
-from .google_sheets import add_new_user, user_exists, save_user_name, user_has_name, set_wait_for_name, is_wait_for_name
+from .repositories.repository import add_new_user, set_wait_for_name, is_wait_for_name, save_user_name, user_exists, \
+    user_has_name
 
 webhook_blueprint = Blueprint("webhook", __name__)
 
