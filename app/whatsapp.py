@@ -78,8 +78,8 @@ def send_order_confirmation(telephone_no, message_body, total_amount, order_id):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        # "to": telephone_no,
-        "to": "48512066441",
+        "to": telephone_no,
+        # "to": "48512066441",
         "type": "template",
         "template": {
             "name": "order_confirm",
@@ -134,8 +134,8 @@ def send_order_to_kitchen_text2(order_id, message_body, telephone_no, isEdit, na
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        # "to": "97333607710",
-        "to": "48512066441",
+        "to": "97333607710",
+        # "to": "48512066441",
         "type": "template",
         "template": {
             "name": "order_info2",
@@ -264,8 +264,8 @@ def send_ready_message(recipient_phone, user_name, user_id):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        # "to": recipient_phone,
-        "to": "420601053179",
+        "to": recipient_phone,
+        # "to": "420601053179",
         "type": "template",
         "template": {
             "name": "last_confirm",
@@ -312,8 +312,8 @@ def send_menu_utility(recipient_phone):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        # "to": recipient_phone,
-        "to": "48512066441",
+        "to": recipient_phone,
+        # "to": "48512066441",
         "type": "template",
         "template": {
             "name": "name_confirmed22",
@@ -365,8 +365,8 @@ def ask_for_name(recipient_phone):
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        # "to": recipient_phone,
-        "to": "48512066441",
+        "to": recipient_phone,
+        # "to": "48512066441",
         "type": "text",
         "text": {
             "body": "Salam Aleikum 👋!\n"
