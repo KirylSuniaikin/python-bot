@@ -124,58 +124,59 @@ def send_order_confirmation(telephone_no, message_body, total_amount, order_id):
 
 def send_order_to_kitchen_text2(order_id, message_body, telephone_no, isEdit, name):
     # logging.info(f"Sending order to kitchen: {order_id}, items: {sorted_items}, total: {total_amount}")
-    url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    header = f"{'✅ New order:' if not isEdit else '✏️ Order'} {order_id}{' updated!' if isEdit else '!'}"
-
-    payload = {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": "97333607710",
-        # "to": "48512066441",
-        "type": "template",
-        "template": {
-            "name": "order_info2",
-            "language": {"code": "en"},
-            "components": [
-                {
-                    "type": "HEADER",
-                    "parameters": [
-                        {
-                            "type": "text",
-                            "parameter_name": "header",
-                            "text": f"{header}"
-                        }
-                    ]
-                },
-                {
-                    "type": "BODY",
-                    "parameters": [
-                        {
-                            "type": "text",
-                            "parameter_name": "client_info",
-                            "text": f"{telephone_no} ({name})"
-                        },
-                        {
-                            "type": "text",
-                            "parameter_name": "orderbody",
-                            "text": f"{message_body}"
-                        }
-                    ]
-                }
-            ]
+    responses = []
+    phones = ["97333607710", "97334344772"]
+    for phone in phones:
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": phone,
+            "type": "template",
+            "template": {
+                "name": "order_info2",
+                "language": {"code": "en"},
+                "components": [
+                    {
+                        "type": "HEADER",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "parameter_name": "header",
+                                "text": f"{'✅ New order:' if not isEdit else '✏️ Order'} {order_id}{' updated!' if isEdit else '!'}"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "BODY",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "parameter_name": "client_info",
+                                "text": f"{telephone_no} ({name})"
+                            },
+                            {
+                                "type": "text",
+                                "parameter_name": "orderbody",
+                                "text": f"{message_body}"
+                            }
+                        ]
+                    }
+                ]
+            }
         }
-    }
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=5)
-        logging.info(f"Sent info to kitchen : {response.status_code}, Response: {response.text}")
-        return response
-    except Exception as e:
-        logging.exception(f"Failed to send order to kitchen {e}")
-        raise
+        try:
+            url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
+            headers = {
+                "Authorization": f"Bearer {ACCESS_TOKEN}",
+                "Content-Type": "application/json"
+            }
+            response = requests.post(url, json=payload, headers=headers, timeout=5)
+            logging.info(f"Sent to {phone} : {response.status_code}, Response: {response.text}")
+            responses.append(response)
+        except Exception as e:
+            logging.exception(f"Failed to send to {phone}: {e}")
+            responses.append(None)
+    return responses
 
 # def send_info_to_kitchen(order_id):
 #     url = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
