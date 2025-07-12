@@ -6,6 +6,7 @@ from app.conf.db_conf import db
 from flask import Flask
 
 from app.services.cache import load_menu_cache, load_extra_ingr_cache
+from app.socketio import socketio
 from app.webhook import webhook_blueprint
 
 
@@ -15,6 +16,8 @@ def create_app():
     load_configurations(app)
     configure_logging()
     CORS(app)
+    socketio.init_app(app)
+
     # Import and register blueprints, if any
     app.register_blueprint(webhook_blueprint, url_prefix="/webhook")
     app.register_blueprint(api_blueprint, url_prefix="/api")
