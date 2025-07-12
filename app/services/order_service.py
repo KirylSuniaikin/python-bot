@@ -6,7 +6,7 @@ from datetime import datetime
 from app.models.models import OrderTO, Order, OrderItem
 from app.repositories.repository import is_user_exist, add_new_user, create_order, create_new_items, update_customer, \
     get_customer_by_id, get_active_orders, update_order_transaction
-from app.socketio import emit_order_created
+from app.socketio import emit_order_created, emit
 from app.whatsapp import send_order_confirmation, send_order_to_kitchen_text2, build_kitchen_message, send_ready_message
 from flask import current_app
 
@@ -83,8 +83,9 @@ def async_new_order_post_processing(appctx, order, telephone_no, sorted_items, n
             update_customer(order)
             send_order_confirmation(telephone_no, message_body, order.amount_paid, order.id)
         data = build_order_payload(order, sorted_items, name)
+        print("we are here")
         emit_order_created(data)
-        send_order_to_kitchen_text2(order.order_no, message_body, telephone_no, False, name)
+        # send_order_to_kitchen_text2(order.order_no, message_body, telephone_no, False, name)
         # send_info_to_kitchen(order.order_no)
 
 def async_ready_order_post_processing(appctx, order):
@@ -99,7 +100,7 @@ def build_order_payload(order: Order, items: list, user_name: str) -> dict:
         "phone_number": order.telephone_no,
         "discount_amount": round(sum(i.get("discount_amount", 0.0) or 0.0 for i in items), 2),
         "customer_name": user_name,
-        "order_created": order.created_at,
+        "order_created": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "payment_type": order.payment_type,
         "notes": order.notes,
         "items": [
@@ -175,7 +176,7 @@ def get_all_active_orders():
             "customer_name": customer_name,
             "order_created": order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
             "payment_type": order.payment_type,
-            "notes": order.notes or "Empty Note",
+            "notes": order.notes or "",
             "items": items
         })
 

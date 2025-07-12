@@ -138,7 +138,7 @@ def get_history_orders():
             "customer_name": order.customer.name if order.customer and order.customer.name else "Unknown customer",
             "order_created": order.created_at.strftime("%Y-%m-%d %H:%M") if order.created_at else "",
             "payment_type": order.payment_type,
-            "notes": order.notes or "Test note",
+            "notes": order.notes or "",
             "items": items
         })
 
