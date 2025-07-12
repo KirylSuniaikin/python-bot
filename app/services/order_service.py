@@ -85,7 +85,7 @@ def async_new_order_post_processing(appctx, order, telephone_no, sorted_items, n
         data = build_order_payload(order, sorted_items, name)
         print("we are here")
         emit_order_created(data)
-        # send_order_to_kitchen_text2(order.order_no, message_body, telephone_no, False, name)
+        send_order_to_kitchen_text2(order.order_no, message_body, telephone_no, False, name)
         # send_info_to_kitchen(order.order_no)
 
 def async_ready_order_post_processing(appctx, order):
