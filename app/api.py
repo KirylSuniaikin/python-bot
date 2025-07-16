@@ -5,7 +5,8 @@ from flask_cors import cross_origin
 
 from app.models.models import OrderTO
 from app.repositories.repository import make_order_ready, get_history_orders, get_user_info, \
-    update_menu_tems_availability, update_dough_availability, update_brick_pizza_availability, update_payment
+    update_menu_tems_availability, update_dough_availability, update_brick_pizza_availability, update_payment, \
+    get_orders_with_customers_for_period
 from app.services.cache import load_menu_cache, load_extra_ingr_cache
 from app.services.order_service import create_new_order, get_all_active_orders, update_order, \
     async_ready_order_post_processing
@@ -222,3 +223,33 @@ def get_base_app_info():
         }
 
     return jsonify(response)
+
+@api_blueprint.route('/get_statistics', methods=['GET'])
+@cross_origin()
+def get_statistics():
+    start_date = request.args.get('start_date')
+    finish_date = request.args.get('finish_date')
+
+    if not start_date or not finish_date:
+        return jsonify({"error": "Missing start_date or finish_date"}), 400
+
+    orders_with_customers = get_orders_with_customers_for_period(start_date, finish_date)
+
+    new_customer_order_count = 0
+    old_customer_order_count = 0
+    total_revenue = 0
+
+    for order, amount_of_orders in orders_with_customers:
+        total_revenue += order.amount_paid
+
+        if amount_of_orders is None or amount_of_orders <= 1:
+            new_customer_order_count += 1
+        else:
+            old_customer_order_count += 1
+
+    return jsonify({
+        "total_revenue": round(total_revenue, 2),
+        "total_order_count": new_customer_order_count+old_customer_order_count,
+        "new_customer_ordered_count": new_customer_order_count,
+        "old_customer_ordered_count": old_customer_order_count
+    })

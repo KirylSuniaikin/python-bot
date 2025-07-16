@@ -146,6 +146,27 @@ def get_history_orders():
     return {"orders": history_orders}
 
 
+def get_orders_with_customers_for_period(start_date, finish_date):
+    start_date = datetime.strptime(start_date, "%Y-%m-%d")
+    finish_date = datetime.strptime(finish_date, "%Y-%m-%d")
+
+    start_datetime = start_date + timedelta(hours=2)
+    finish_datetime = finish_date + timedelta(days=1, hours=1, minutes=59, seconds=59)
+    print(start_datetime)
+    print(finish_datetime)
+
+    return db.session.query(
+        Order,
+        Customer.amount_of_orders
+    ).outerjoin(
+        Customer,
+        Customer.telephone_no == Order.telephone_no
+    ).filter(
+        Order.created_at >= start_datetime,
+        Order.created_at <= finish_datetime
+    ).all()
+
+
 def make_order_ready(order_id):
     order = Order.query.filter_by(id=order_id).first()
     if not order:
