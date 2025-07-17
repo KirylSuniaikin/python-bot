@@ -6,7 +6,8 @@ from datetime import datetime
 from app.models.models import OrderTO, Order, OrderItem
 from app.repositories.repository import is_user_exist, add_new_user, create_order, create_new_items, update_customer, \
     get_customer_by_id, get_active_orders, update_order_transaction
-from app.socketio import emit_order_created, emit
+from app.socketio import emit_order_created
+from app.tt_integration import send_tiktok_event
 from app.whatsapp import send_order_confirmation, send_order_to_kitchen_text2, build_kitchen_message, send_ready_message
 from flask import current_app
 
@@ -76,6 +77,7 @@ def create_new_order(order: OrderTO, name):
         "message": "Order created successfully"
     }
 
+
 def async_new_order_post_processing(appctx, order, telephone_no, sorted_items, name):
     with appctx:
         message_body = build_kitchen_message(sorted_items)
@@ -86,6 +88,7 @@ def async_new_order_post_processing(appctx, order, telephone_no, sorted_items, n
         print("we are here")
         emit_order_created(data)
         send_order_to_kitchen_text2(order.order_no, message_body, telephone_no, False, name)
+        send_tiktok_event(telephone_no, order.amount_paid)
         # send_info_to_kitchen(order.order_no)
 
 def async_ready_order_post_processing(appctx, order):
