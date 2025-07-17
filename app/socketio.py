@@ -1,5 +1,5 @@
 import logging
-
+import threading
 from flask_socketio import SocketIO, join_room
 
 socketio = SocketIO(async_mode="threading", cors_allowed_origins="*")
@@ -22,8 +22,6 @@ def handle_join_room(room_name):
 def handle_disconnect():
     print("Client disconnected")
 
-
-import threading
 
 def emit_order_created(order_data: dict):
     room_participants = list(socketio.server.manager.rooms['/'].get('orders_room', set()))
