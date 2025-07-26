@@ -26,43 +26,6 @@ class ExtraIngr:
     available: bool
 
 
-# @dataclass
-# class Order:
-#     id: int
-#     order_no: int
-#     telephone_no: str
-#     status: str
-#     created_at: str
-#     type: str
-#     address: str
-#     amount_paid: float
-#     payment_type: str
-#     notes: str = ""
-
-
-# @dataclass
-# class OrderItem:
-#     order_id: int
-#     id: int
-#     name: str
-#     quantity: int
-#     amount: float
-#     size: str
-#     category: str
-#     is_garlic_crust: bool
-#     is_thin_dough: bool
-#     description: str
-#     discount_amount: float
-
-
-# @dataclass
-# class Check:
-#     order_id: str
-#     total: float
-#     items: List[OrderItem]
-#     date: str
-
-
 @dataclass
 class OrderTO:
     items: list[dict]
@@ -77,18 +40,6 @@ class OrderTO:
     address: Optional[str] = None
     items: Optional[list[dict]] = None
     payment_type: Optional[str] = None
-
-
-# @dataclass
-# class Customer:
-#     id: int
-#     telephone_no: str
-#     name: str
-#     address: str
-#     amount_of_orders: int
-#     amount_paid: float
-#     last_order: str
-#     waiting_for_name: int
 
 
 class Customer(db.Model):
@@ -167,7 +118,14 @@ class Order(db.Model):
     payment_type = db.Column(db.String)
 
     items = db.relationship("OrderItem", backref="order", lazy="joined")
-    customer = db.relationship("Customer", backref="orders", primaryjoin="Order.telephone_no == Customer.telephone_no", lazy="joined")
+
+    customer = db.relationship(
+        "Customer",
+        backref="orders",
+        primaryjoin="Order.telephone_no == Customer.telephone_no",
+        lazy="joined",
+        uselist=False,
+    )
 
 
 class OrderItem(db.Model):

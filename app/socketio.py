@@ -13,9 +13,9 @@ def handle_connect():
 def handle_join_room(room_name):
     join_room(room_name)
     from flask import request
-    print(f"✅ Client joined room: {room_name}")
-    print(f"Client sid: {request.sid}")
-    print(f"All sids in room {room_name}: {socketio.server.manager.rooms['/'].get(room_name, set())}")
+    # print(f"✅ Client joined room: {room_name}")
+    # print(f"Client sid: {request.sid}")
+    # print(f"All sids in room {room_name}: {socketio.server.manager.rooms['/'].get(room_name, set())}")
 
 
 @socketio.on('disconnect')
@@ -25,7 +25,7 @@ def handle_disconnect():
 
 def emit_order_created(order_data: dict):
     room_participants = list(socketio.server.manager.rooms['/'].get('orders_room', set()))
-    print(f"🔔 Clients in 'orders_room': {room_participants}")
+    # print(f"🔔 Clients in 'orders_room': {room_participants}")
     ack_received = {"status": False}
 
     def ack(response):

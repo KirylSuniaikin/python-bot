@@ -6,7 +6,8 @@ from flask_cors import cross_origin
 from app.models.models import OrderTO
 from app.repositories.repository import make_order_ready, get_history_orders, get_user_info, \
     update_menu_tems_availability, update_dough_availability, update_brick_pizza_availability, update_payment, \
-    get_orders_with_customers_for_period
+    get_orders_with_customers_for_period, get_retention_metric, get_customer_stats, \
+    get_arpu_aov
 from app.services.cache import load_menu_cache, load_extra_ingr_cache
 from app.services.order_service import create_new_order, get_all_active_orders, update_order, \
     async_ready_order_post_processing
@@ -229,6 +230,7 @@ def get_base_app_info():
 def get_statistics():
     start_date = request.args.get('start_date')
     finish_date = request.args.get('finish_date')
+    certain_date = request.args.get('certain_date')
 
     if not start_date or not finish_date:
         return jsonify({"error": "Missing start_date or finish_date"}), 400
@@ -247,9 +249,25 @@ def get_statistics():
         else:
             old_customer_order_count += 1
 
+    # total_revenue_all_time = get_total_revenue()
+    # print(total_revenue_all_time)
+    # total_orders_all_time = get_total_orders()
+    # unique_customers_all_time_in_orders = get_unique_customers_all_time_in_orders()
+
+    arpu_aov = get_arpu_aov()
+    retention_metric = get_retention_metric(certain_date)
+    customer_stats = get_customer_stats()
+
     return jsonify({
         "total_revenue": round(total_revenue, 2),
         "total_order_count": new_customer_order_count+old_customer_order_count,
         "new_customer_ordered_count": new_customer_order_count,
-        "old_customer_ordered_count": old_customer_order_count
+        "old_customer_ordered_count": old_customer_order_count,
+        "ARPU": arpu_aov["ARPU"],
+        "unique_customers_all_time": customer_stats["unique_customers_all_time"],
+        "repeat_customers_all_time": customer_stats["repeat_customers_all_time"],
+        "average_order_value_all_time": arpu_aov["AOV"],
+        "month_total_customers": retention_metric["month_total_customers"],
+        "retained_customers": retention_metric["retained_customers"],
+        "retention_percentage": round(retention_metric["retention_percentage"], 2) if retention_metric["retention_percentage"] else None
     })
