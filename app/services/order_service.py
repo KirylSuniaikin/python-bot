@@ -85,19 +85,21 @@ def async_new_order_post_processing(appctx, order, telephone_no, sorted_items, n
             update_customer(order)
             send_order_confirmation(telephone_no, message_body, order.amount_paid, order.id)
         data = build_order_payload(order, sorted_items, name)
-        print("we are here")
         emit_order_created(data)
         send_order_to_kitchen_text2(order.order_no, message_body, telephone_no, False, name)
         send_tiktok_event(telephone_no, order.amount_paid)
         # send_info_to_kitchen(order.order_no)
 
+
 def async_ready_order_post_processing(appctx, order):
     with appctx:
         send_ready_message(order.telephone_no, order.customer.name, order.customer.id)
 
+
 def build_order_payload(order: Order, items: list, user_name: str) -> dict:
     return {
-        "orderId": order.order_no,
+        "id": order.id,
+        "order_no": order.order_no,
         "order_type": order.type,
         "amount_paid": order.amount_paid,
         "phone_number": order.telephone_no,
@@ -117,7 +119,7 @@ def build_order_payload(order: Order, items: list, user_name: str) -> dict:
                 "is_thin_dough": i.get("is_thin_dough", False),
                 "description": i.get("description", ""),
                 "discount_amount": i.get("discount_amount", 0.0),
-                "photo": i.get("photo", ""),
+                "photo": next((m["photo"] for m in current_app.menu_cache if m["name"] == i["name"]), "")
             }
             for i in items
         ]
@@ -131,7 +133,6 @@ def update_order(order: OrderTO):
         logging.warning("Order update failed; skipping post-processing.")
         return
     if order.tel and order.tel != "Unknown customer":
-        print("lol")
         sorted_items = order_info.get("sorted_items", [])
         customer_name = order_info.get("customer_name", "no name")
 
@@ -153,7 +154,6 @@ def get_all_active_orders():
         customer_name = order.customer.name if order.customer and order.customer.name else None
 
         items = []
-        print(order.items)
         for item in order.items:
             items.append({
                 "name": item.name,

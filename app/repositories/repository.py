@@ -3,6 +3,7 @@ import random
 from datetime import datetime, timedelta
 import pytz
 from flask import current_app
+from sqlalchemy import func, distinct, and_, cast, Numeric, select, text
 
 from app.conf.db_conf import db
 from app.models.models import Order, OrderItem, Customer, MenuItem, OrderTO, ExtraIngr
@@ -11,6 +12,10 @@ from app.models.models import Order, OrderItem, Customer, MenuItem, OrderTO, Ext
 ##########
 #ORDERS
 ##########
+
+def get_unique_customers_all_time_in_orders():
+    return db.session.query(func.count(distinct(Order.telephone_no))).filter(Order.telephone_no != None).scalar() or 0
+
 
 def create_order(order: Order):
     db.session.add(order)
@@ -322,4 +327,87 @@ def get_user_info(user_id):
     return {
         "phone": None,
         "name": None
+    }
+
+
+def get_customer_stats():
+    result = db.session.query(
+        func.count(distinct(Customer.telephone_no)).label("unique_customers"),
+        func.count().filter(Customer.amount_of_orders > 1).label("repeat_customers")
+    ).one()
+
+    return {
+        "unique_customers_all_time": result.unique_customers,
+        "repeat_customers_all_time": result.repeat_customers
+    }
+
+
+def get_arpu_aov():
+    result = db.session.query(
+        func.round(
+            cast(func.sum(Customer.amount_paid), Numeric) / func.count(distinct(Customer.telephone_no)), 2
+        ).label("ARPU"),
+        func.round(
+            cast(func.sum(Customer.amount_paid), Numeric) / func.sum(Customer.amount_of_orders), 2
+        ).label("AOV")
+    ).one()
+
+    return {
+        "ARPU": float(result.ARPU),
+        "AOV": float(result.AOV)
+    }
+
+
+def get_retention_metric(certain_date):
+    certain_dt = datetime.strptime(certain_date, "%Y-%m-%d")
+    prev_month_start = (certain_dt.replace(day=1) - timedelta(days=1)).replace(day=1)
+    curr_month_start = certain_dt.replace(day=1)
+    curr_date_end = certain_dt
+
+    print("prev_month_start:", prev_month_start.strftime("%Y-%m-%d"))
+    print("end:", curr_month_start.strftime("%Y-%m-%d"))
+
+    first_orders_subq = (
+        db.session.query(
+            Order.telephone_no.label("tel"),
+            func.min(Order.created_at).label("first_order_date")
+        ).group_by(Order.telephone_no)
+    ).subquery()
+
+    prev_month_customers = (
+        db.session.query(first_orders_subq.c.tel)
+        .filter(
+            first_orders_subq.c.first_order_date >= prev_month_start,
+            first_orders_subq.c.first_order_date < curr_month_start
+        )
+    ).subquery()
+
+    month_total_customers = db.session.query(prev_month_customers).count()
+
+    retained_customers = db.session.execute(text("""
+        SELECT COUNT(*) FROM (
+            SELECT DISTINCT o.telephone_no
+            FROM orders o
+            JOIN (
+                SELECT telephone_no, MIN(created_at) AS first_order
+                FROM orders
+                GROUP BY telephone_no
+                HAVING MIN(created_at) >= :prev_month_start AND MIN(created_at) < :curr_month_start
+            ) first_orders
+            ON o.telephone_no = first_orders.telephone_no
+            WHERE o.created_at > first_orders.first_order
+              AND o.created_at <= :curr_date_end
+        ) retained
+    """), {
+        "prev_month_start": prev_month_start,
+        "curr_month_start": curr_month_start,
+        "curr_date_end": curr_date_end
+    }).scalar()
+
+    retention_percentage = (retained_customers / month_total_customers * 100) if month_total_customers else 0
+
+    return {
+        "month_total_customers": month_total_customers,
+        "retained_customers": retained_customers,
+        "retention_percentage": retention_percentage
     }
