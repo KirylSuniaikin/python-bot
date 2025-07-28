@@ -270,6 +270,7 @@ def get_statistics():
     })
 
 @api_blueprint.route("/sendShiftEvent", methods=["POST"])
+@cross_origin()
 def create_event():
     data = request.json
     print(">>> RAW JSON from client:", data)
