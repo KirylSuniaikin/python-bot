@@ -6,7 +6,6 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin
 from sqlalchemy import func
 from app.conf.db_conf import db
-from dateutil import parser
 
 from app.models.models import OrderTO, EventType, Event
 from app.repositories.repository import make_order_ready, get_history_orders, get_user_info, \
