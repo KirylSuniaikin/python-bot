@@ -1,7 +1,6 @@
 import logging
 import threading
 from datetime import datetime
-
 import pytz
 from flask import Blueprint, request, jsonify, current_app
 from flask_cors import cross_origin

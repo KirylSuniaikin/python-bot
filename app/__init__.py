@@ -21,7 +21,8 @@ def create_app():
     # Import and register blueprints, if any
     app.register_blueprint(webhook_blueprint, url_prefix="/webhook")
     app.register_blueprint(api_blueprint, url_prefix="/api")
-    CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+    # CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+    CORS(app, origins=["https://ic-pizza.com"], supports_credentials=True)
 
     app.config['SECRET_KEY'] = 'secret!'
     app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://icposdb_user:Sdm7Z4zflKeMY1Aqb6gXOtidTbZtBlJH@dpg-d1j5bd2li9vc739dg45g-a/icposdb"
