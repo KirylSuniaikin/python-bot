@@ -41,7 +41,9 @@ def create_new_order(order: OrderTO, name):
         notes=order.notes,
         address=address
     )
+    logging.info(new_order.created_at)
     create_order(new_order)
+
 
     for item in sorted_items:
         discount_raw = item.get("discount_amount", 0.0)

@@ -1,5 +1,10 @@
+import enum
+import uuid
 from dataclasses import dataclass
 from typing import Optional
+from datetime import datetime
+import pytz
+from sqlalchemy.dialects.postgresql.base import TIMESTAMP
 
 from app.conf.db_conf import db
 
@@ -142,3 +147,22 @@ class OrderItem(db.Model):
     is_thin_dough = db.Column(db.Boolean)
     description = db.Column(db.String)
     discount_amount = db.Column(db.Float)
+
+## SHIFT MODELS:
+
+class EventType(enum.Enum):
+    OPEN_SHIFT_CASH_CHECK = "OPEN_SHIFT_CASH_CHECK"
+    OPEN_SHIFT_EVENT = "OPEN_SHIFT_EVENT"
+    CLOSE_SHIFT_CASH_CHECK = "CLOSE_SHIFT_CASH_CHECK"
+    CLOSE_SHIFT_EVENT = "CLOSE_SHIFT_EVENT"
+
+class Event(db.Model):
+    __tablename__ = "events"
+
+    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    type = db.Column(db.Enum(EventType), nullable=False)
+    datetime = db.Column(db.DateTime)
+    prep_plan = db.Column(db.Text, nullable=True)
+    cash_amount = db.Column(db.Float, nullable=True)
+    branch_id = db.Column(db.String, nullable=False)
+    shift_no = db.Column(db.Integer, nullable=False)
