@@ -1,13 +1,13 @@
-import logging
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
+import logging
 import pytz
 from flask import current_app
-from sqlalchemy import func, distinct, and_, cast, Numeric, select, text
-
+from sqlalchemy import func, distinct, cast, Numeric, text
 from app.conf.db_conf import db
-from app.models.models import Order, OrderItem, Customer, MenuItem, OrderTO, ExtraIngr
+from app.models.models import Order, OrderItem, Customer, MenuItem, OrderTO, ExtraIngr, Event
 
+BAHRAIN_TZ = pytz.timezone("Asia/Bahrain")
 
 ##########
 #ORDERS
@@ -411,3 +411,74 @@ def get_retention_metric(certain_date):
         "retained_customers": retained_customers,
         "retention_percentage": retention_percentage
     }
+
+##########
+#SHIFT
+##########
+
+def get_latest_stage(branch_id):
+    event = (
+        Event.query
+        .filter_by(branch_id=branch_id)
+        .order_by(Event.datetime.desc())
+        .first()
+    )
+    logging.info(f"latest_stage: {event}")
+    return event.type.value if event else None
+
+def get_open_shift_cash(branch_id):
+    bahrain_tz = pytz.timezone("Asia/Bahrain")
+    now = datetime.now(bahrain_tz)
+    today = now.date()
+
+    if now.time() < time(2, 0):
+        shift_start_date = today - timedelta(days=1)
+    else:
+        shift_start_date = today
+
+    shift_end_date = shift_start_date + timedelta(days=1)
+
+    start_time = datetime.combine(shift_start_date, time(14, 0))
+    end_time = datetime.combine(shift_end_date, time(2, 0))
+
+    logging.info(f"[CASH CHECK] Time range (Bahrain local): {start_time} to {end_time}")
+
+    event = db.session.query(Event).filter(
+        Event.type == 'OPEN_SHIFT_CASH_CHECK',
+        Event.branch_id == branch_id,
+        Event.datetime >= start_time,
+        Event.datetime < end_time
+    ).order_by(Event.datetime.desc()).first()
+
+    if event:
+        logging.info(f"[CASH CHECK] ✅ Found OPEN_SHIFT_CASH_CHECK: {event.cash_amount}")
+        return event.cash_amount
+    return 0.0
+
+
+
+def get_total_cash_orders():
+    bahrain_tz = pytz.timezone("Asia/Bahrain")
+    now = datetime.now(bahrain_tz)
+    today = now.date()
+
+    if now.time() < time(2, 0):
+        shift_start_date = today - timedelta(days=1)
+    else:
+        shift_start_date = today
+
+    shift_end_date = shift_start_date + timedelta(days=1)
+
+    start_time = datetime.combine(shift_start_date, time(14, 0))
+    end_time = datetime.combine(shift_end_date, time(2, 0))
+
+    cash_orders = db.session.query(Order).filter(
+        Order.payment_type == 'Cash',
+        Order.created_at >= start_time,
+        Order.created_at < end_time
+    ).all()
+
+    total_cash = sum(order.amount_paid for order in cash_orders)
+
+    return total_cash
+
