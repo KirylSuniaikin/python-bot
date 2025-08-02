@@ -271,7 +271,7 @@ def get_statistics():
 @cross_origin()
 def create_event():
     data = request.json
-    print(">>> RAW JSON from client:", data)
+    # print(">>> RAW JSON from client:", data)
     branch_id = data["branch_id"]
     event_type = EventType[data["type"]]
 
@@ -290,9 +290,9 @@ def create_event():
     if event_type == EventType.CLOSE_SHIFT_CASH_CHECK:
         entered_cash = data.get("cash_amount")
         initial_cash = get_open_shift_cash(branch_id)
-        logging.info(f"[CASH CHECK] ✅ Found OPEN_SHIFT_CASH_CHECK: {initial_cash}")
+        # logging.info(f"[CASH CHECK] ✅ Found OPEN_SHIFT_CASH_CHECK: {initial_cash}")
         orders_total = get_total_cash_orders()
-        logging.info(f"[CASH CHECK] 💸 Sum of CASH orders: {orders_total}")
+        # logging.info(f"[CASH CHECK] 💸 Sum of CASH orders: {orders_total}")
         expected_cash = round(initial_cash + orders_total, 2)
         expected_cash_today = initial_cash + orders_total
 
@@ -305,7 +305,7 @@ def create_event():
 
     event = Event(
         type=event_type,
-        datetime=datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M"),
+        datetime=datetime.now(pytz.timezone("Asia/Bahrain")).strftime("%Y-%m-%d %H:%M:%S"),
         prep_plan=data.get("prep_plan"),
         cash_amount=data.get("cash_amount"),
         branch_id=branch_id,
