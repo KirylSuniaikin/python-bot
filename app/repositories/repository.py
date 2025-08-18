@@ -214,7 +214,7 @@ def create_new_items(items: [OrderItem]):
 ##########
 
 def get_menu_items():
-    return MenuItem.query.all()
+    return MenuItem.query.order_by(MenuItem.id.asc()).all()
 
 def update_menu_tems_availability(name, enabled):
     MenuItem.query.filter_by(name=name).update({'available': enabled})
